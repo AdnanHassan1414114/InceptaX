@@ -113,7 +113,7 @@ const oauthCallback = async (req, res) => {
 
     if (isNewUser) sendWelcomeEmail(user);
 
-    const redirectUrl = `${process.env.CLIENT_URL}/auth/callback?token=${accessToken}&provider=${user.oauthProvider}`;
+    const redirectUrl = `${process.env.CLIENT_URL}/auth/dashboard?token=${accessToken}&provider=${user.oauthProvider}`;
     res.redirect(redirectUrl);
   } catch (err) {
     console.error('[oauthCallback] Error:', err.message);
