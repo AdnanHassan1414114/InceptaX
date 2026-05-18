@@ -121,7 +121,7 @@ const oauthCallback = async (req, res) => {
   }
 };
 
-// 🔹 NEW — FORGOT PASSWORD
+// 🔹 NEW — FORGOT PASSWORD 
 // POST /api/auth/forgot-password
 // Generates a secure reset token, stores hashed version in DB, emails raw token
 const forgotPassword = asyncHandler(async (req, res) => {
