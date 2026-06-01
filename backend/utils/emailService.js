@@ -2,117 +2,109 @@
  * utils/emailService.js
  *
  * Centralized Nodemailer email service for InceptaX.
- * All send functions are fire-and-forget — they catch their own errors
- * so an email failure NEVER breaks the calling controller.
+ * All send functions are fire-and-forget — never throw, never block responses.
  *
  * Install: npm install nodemailer
  *
- * .env keys required:
- *   EMAIL_HOST=smtp.gmail.com          (or smtp.sendgrid.net etc.)
+ * .env:
+ *   EMAIL_HOST=smtp.gmail.com
  *   EMAIL_PORT=587
- *   EMAIL_SECURE=false                 (true for port 465)
+ *   EMAIL_SECURE=false
  *   EMAIL_USER=your@gmail.com
- *   EMAIL_PASS=your_app_password       (Gmail: use App Password, not account password)
+ *   EMAIL_PASS=your_app_password
  *   EMAIL_FROM="InceptaX <your@gmail.com>"
- *
- * Gmail setup:
- *   1. Enable 2-Step Verification on your Google account
- *   2. Go to myaccount.google.com → Security → App passwords
- *   3. Generate an App Password and use it as EMAIL_PASS
  */
 
 const nodemailer = require('nodemailer');
-const { getWelcomeTemplate,
-        getSubmissionPublishedTemplate,
-        getSubmissionRejectedTemplate,
-        getPaymentConfirmationTemplate,
-        getDeadlineReminderTemplate,
-        getPasswordResetTemplate,
-        getEmailBlastTemplate } = require('./emailTemplates');
+const {
+  getOTPTemplate,
+  getWelcomeTemplate,
+  getSubmissionPublishedTemplate,
+  getSubmissionRejectedTemplate,
+  getPaymentConfirmationTemplate,
+  getDeadlineReminderTemplate,
+  getEmailBlastTemplate,
+  getPasswordResetTemplate,
+} = require('./emailTemplates');
 
-// ── Lazy transporter — created once on first use ──────────────────────────────
+// ── Lazy transporter ──────────────────────────────────────────────────────────
 let _transporter = null;
 
 function getTransporter() {
   if (_transporter) return _transporter;
-
   _transporter = nodemailer.createTransport({
-    host:   process.env.EMAIL_HOST   || 'smtp.gmail.com',
-    port:   parseInt(process.env.EMAIL_PORT || '587'),
-    secure: process.env.EMAIL_SECURE === 'true', // true = TLS on port 465
+    host:              process.env.EMAIL_HOST   || 'smtp.gmail.com',
+    port:              parseInt(process.env.EMAIL_PORT || '587'),
+    secure:            process.env.EMAIL_SECURE === 'true',
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
     },
-    // Prevent connection timeouts in production
     connectionTimeout: 10000,
     greetingTimeout:   10000,
   });
-
   return _transporter;
 }
 
 const FROM = () => process.env.EMAIL_FROM || `"InceptaX" <${process.env.EMAIL_USER}>`;
 
-// ── Core send function ────────────────────────────────────────────────────────
-/**
- * Send a single email. Fire-and-forget — never throws.
- * @param {{ to: string, subject: string, html: string, text?: string }} options
- */
+// ── Core send ─────────────────────────────────────────────────────────────────
 async function sendEmail({ to, subject, html, text }) {
   try {
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      console.warn('[EmailService] EMAIL_USER / EMAIL_PASS not set — skipping email send');
+      // In development without SMTP creds, log the email body to the terminal
+      // so you can still test flows. In production this should never happen.
+      console.warn('[EmailService] ⚠️  EMAIL_USER/EMAIL_PASS not set — printing email to terminal instead');
+      console.log(`\n${'═'.repeat(60)}`);
+      console.log(`📧 TO:      ${to}`);
+      console.log(`📌 SUBJECT: ${subject}`);
+      console.log(`📄 BODY (text):\n${(text || html).replace(/<[^>]*>/g, '').trim()}`);
+      console.log(`${'═'.repeat(60)}\n`);
       return;
     }
-
-    const transporter = getTransporter();
-    const info = await transporter.sendMail({
-      from:    FROM(),
-      to,
-      subject,
-      html,
-      text:    text || html.replace(/<[^>]*>/g, ''), // plain text fallback
+    const info = await getTransporter().sendMail({
+      from: FROM(), to, subject, html,
+      text: text || html.replace(/<[^>]*>/g, ''),
     });
-
-    console.log(`[EmailService] Sent "${subject}" to ${to} — id: ${info.messageId}`);
+    console.log(`[EmailService] ✅ Sent "${subject}" to ${to} — ${info.messageId}`);
   } catch (err) {
-    // Never throw — email failure must NOT break any controller
-    console.error(`[EmailService] Failed to send "${subject}" to ${to}:`, err.message);
-  }
-}
-
-/**
- * Send emails to multiple recipients efficiently (one per recipient for personalisation).
- * Batches sends in groups of 10 to avoid overwhelming the SMTP server.
- */
-async function sendBulkEmail(recipients, { subject, getHtml }) {
-  if (!recipients?.length) return;
-
-  const BATCH = 10;
-  for (let i = 0; i < recipients.length; i += BATCH) {
-    const batch = recipients.slice(i, i + BATCH);
-    await Promise.allSettled(
-      batch.map((r) =>
-        sendEmail({
-          to:      r.email,
-          subject,
-          html:    getHtml(r),
-        })
-      )
-    );
-    // Small delay between batches to respect SMTP rate limits
-    if (i + BATCH < recipients.length) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    // Log the full error so you know exactly why delivery failed
+    console.error(`[EmailService] ❌ Failed to send "${subject}" to ${to}:`);
+    console.error(`  Code: ${err.code || 'N/A'}  |  Message: ${err.message}`);
+    if (err.code === 'EAUTH') {
+      console.error('  → Check EMAIL_USER and EMAIL_PASS in your .env file.');
+      console.error('  → For Gmail, use an App Password (not your Google account password).');
+      console.error('  → Enable 2FA on your Google account, then generate an App Password at https://myaccount.google.com/apppasswords');
     }
   }
 }
 
-// ── Named email senders ───────────────────────────────────────────────────────
+async function sendBulkEmail(recipients, { subject, getHtml }) {
+  if (!recipients?.length) return;
+  const BATCH = 10;
+  for (let i = 0; i < recipients.length; i += BATCH) {
+    await Promise.allSettled(
+      recipients.slice(i, i + BATCH).map((r) =>
+        sendEmail({ to: r.email, subject, html: getHtml(r) })
+      )
+    );
+    if (i + BATCH < recipients.length) {
+      await new Promise((res) => setTimeout(res, 500));
+    }
+  }
+}
 
-/**
- * Welcome email sent after registration or first OAuth sign-in.
- */
+// ── Named senders ─────────────────────────────────────────────────────────────
+
+// 🔹 OTP verification email
+async function sendOTPEmail(user, otp) {
+  await sendEmail({
+    to:      user.email,
+    subject: `${otp} is your InceptaX verification code`,
+    html:    getOTPTemplate(user, otp),
+  });
+}
+
 async function sendWelcomeEmail(user) {
   await sendEmail({
     to:      user.email,
@@ -121,9 +113,6 @@ async function sendWelcomeEmail(user) {
   });
 }
 
-/**
- * Notify user their submission has been published with final score.
- */
 async function sendSubmissionPublishedEmail(user, submission) {
   await sendEmail({
     to:      user.email,
@@ -132,9 +121,6 @@ async function sendSubmissionPublishedEmail(user, submission) {
   });
 }
 
-/**
- * Notify user their submission was rejected with admin notes.
- */
 async function sendSubmissionRejectedEmail(user, submission) {
   await sendEmail({
     to:      user.email,
@@ -143,9 +129,6 @@ async function sendSubmissionRejectedEmail(user, submission) {
   });
 }
 
-/**
- * Payment confirmation after successful Razorpay transaction.
- */
 async function sendPaymentConfirmationEmail(user, { planName, expiresAt, paymentId }) {
   await sendEmail({
     to:      user.email,
@@ -154,11 +137,6 @@ async function sendPaymentConfirmationEmail(user, { planName, expiresAt, payment
   });
 }
 
-/**
- * Deadline reminder email (called by cron).
- * @param {Array<{email: string, name: string}>} recipients
- * @param {{ title: string, deadline: Date, hoursLeft: number, challengeLink: string }} assignment
- */
 async function sendDeadlineReminderEmails(recipients, assignment) {
   await sendBulkEmail(recipients, {
     subject: `⏰ ${assignment.title} — deadline in ~${assignment.hoursLeft}h`,
@@ -166,11 +144,6 @@ async function sendDeadlineReminderEmails(recipients, assignment) {
   });
 }
 
-/**
- * Admin email blast to all / plan-specific users.
- * @param {Array<{email: string, name: string}>} recipients
- * @param {{ subject: string, body: string }} blast
- */
 async function sendEmailBlast(recipients, blast) {
   await sendBulkEmail(recipients, {
     subject: blast.subject,
@@ -178,9 +151,6 @@ async function sendEmailBlast(recipients, blast) {
   });
 }
 
-/**
- * Password reset email with a one-time token link.
- */
 async function sendPasswordResetEmail(user, resetToken) {
   const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
   await sendEmail({
@@ -193,6 +163,7 @@ async function sendPasswordResetEmail(user, resetToken) {
 module.exports = {
   sendEmail,
   sendBulkEmail,
+  sendOTPEmail,                    // 🔹
   sendWelcomeEmail,
   sendSubmissionPublishedEmail,
   sendSubmissionRejectedEmail,

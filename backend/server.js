@@ -10,9 +10,10 @@ const passport     = require('./config/passportConfig');
 
 const connectDB    = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
-const { verifyAccessToken } = require('./utils/tokenUtils');
-const { createBulkNotifications } = require('./utils/notificationService');
-const { sendDeadlineReminderEmails } = require('./utils/emailService'); // 🔹 NEW
+const { verifyAccessToken }         = require('./utils/tokenUtils');
+const { createBulkNotifications }   = require('./utils/notificationService');
+const { sendDeadlineReminderEmails } = require('./utils/emailService');
+const { initChatPubSub, closeChatPubSub } = require('./utils/chatPubSub'); // 🔹 NEW
 
 // Routes
 const authRoutes         = require('./routes/authRoutes');
@@ -39,6 +40,12 @@ const io = new Server(httpServer, {
   cors: { origin: process.env.CLIENT_URL, credentials: true },
 });
 app.set('io', io);
+
+// 🔹 Initialize Redis Pub/Sub for team chat.
+// Must be called AFTER io is created and BEFORE any messages can be sent.
+// The subscriber pattern-subscribes to ix:chat:team:* and re-emits
+// incoming payloads to the correct Socket.io room on this instance.
+initChatPubSub(io);
 
 // ── Middleware ─────────────────────────────────────────────────────────────
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
@@ -81,8 +88,12 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
+  // Personal room for notifications
   if (socket.userId) socket.join(`user:${socket.userId}`);
 
+  // Join team rooms — client sends array of teamIds it's a member of.
+  // The socket rooms are used by chatPubSub.js subscriber to re-emit
+  // messages from Redis to the right clients on THIS instance.
   socket.on('join_teams', (teamIds) => {
     if (!Array.isArray(teamIds)) return;
     teamIds.forEach((id) => {
@@ -100,7 +111,6 @@ io.on('connection', (socket) => {
 });
 
 // ── Deadline cron — runs every hour ─────────────────────────────────────────
-// 🔹 UPDATED — now sends both in-app notifications AND emails
 cron.schedule('0 * * * *', async () => {
   console.log('[CRON] Running deadline-approaching check...');
   try {
@@ -127,7 +137,6 @@ cron.schedule('0 * * * *', async () => {
       const userIds   = eligible.map((u) => u._id);
       const hoursLeft = Math.round((new Date(assignment.deadline) - now) / (1000 * 60 * 60));
 
-      // In-app notification (unchanged)
       await createBulkNotifications(app, userIds, {
         type:    'deadline_approaching',
         message: `⏰ "${assignment.title}" closes in ~${hoursLeft}h — don't miss out!`,
@@ -135,7 +144,6 @@ cron.schedule('0 * * * *', async () => {
         metadata: { assignmentId: assignment._id, deadline: assignment.deadline, hoursLeft },
       });
 
-      // 🔹 Email reminder — fire-and-forget
       sendDeadlineReminderEmails(eligible, {
         _id:      assignment._id,
         title:    assignment.title,
@@ -149,6 +157,21 @@ cron.schedule('0 * * * *', async () => {
     console.error('[CRON] Error:', err.message);
   }
 });
+
+// ── Graceful shutdown ────────────────────────────────────────────────────────
+// 🔹 Close Redis pub/sub connections cleanly on process exit so ioredis
+//    doesn't log errors about abrupt disconnects.
+async function shutdown(signal) {
+  console.log(`\n[Server] ${signal} received — shutting down gracefully`);
+  await closeChatPubSub();
+  httpServer.close(() => {
+    console.log('[Server] HTTP server closed');
+    process.exit(0);
+  });
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 // ── Start ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;

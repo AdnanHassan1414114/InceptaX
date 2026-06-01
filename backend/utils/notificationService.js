@@ -1,44 +1,105 @@
 /**
- * notificationService.js
+ * utils/notificationService.js
  *
- * Reusable notification utility. Imported by any controller that needs to
- * create notifications. All functions are fire-and-forget — they catch their
- * own errors so a notification failure NEVER breaks the calling controller.
+ * 🔹 REDIS — unread notification count is now maintained as a Redis counter
+ * (INCR / DECR / DEL) instead of running countDocuments({ read: false }) on
+ * every GET /api/notifications request.
  *
- * Socket emission:
- *   Users join a personal room named `user:<userId>` when they connect.
- *   (Wired in server.js after socket auth.)
- *   We emit the "notification" event to that room.
+ * Counter key:  ix:notif:unread:<userId>   (no TTL — exact, always live)
+ *
+ * Rules:
+ *   createNotification      → INCR by 1
+ *   createBulkNotifications → INCR by N (one INCRBY per user)
+ *   markAsRead (single)     → DECR by 1 (floor at 0 via getAndClamp)
+ *   markAllAsRead           → DEL key (reset to 0)
+ *   deleteNotification      → DECR by 1 if the deleted notification was unread
+ *
+ * Failure policy:
+ *   All Redis counter operations are wrapped in try/catch and are non-fatal.
+ *   If Redis is unavailable, the HTTP response still succeeds — the counter
+ *   just falls back to a MongoDB countDocuments query on the next GET.
  */
 
-const Notification = require('../models/Notification');
+const Notification   = require('../models/Notification');
+const getRedisClient = require('../config/redisClient');
+const REDIS_KEYS     = require('../config/redisKeys');
 
 // Hard cap: if a user exceeds this many notifications, oldest are deleted
 const MAX_NOTIFICATIONS_PER_USER = 100;
 
+// ── Redis counter helpers ─────────────────────────────────────────────────────
+
 /**
- * Get the Socket.io instance.
- * We accept `app` (Express app) so callers don't need to import it themselves.
- * Returns null safely if socket isn't set up yet.
- *
- * @param {import('express').Application} app
- * @returns {import('socket.io').Server | null}
+ * Increment the unread counter for a user by `amount` (default 1).
+ * Uses INCRBY so bulk creates are a single Redis call.
  */
-function getIO(app) {
+async function incrUnread(userId, amount = 1) {
   try {
-    return app?.get('io') || null;
-  } catch {
-    return null;
+    const redis = getRedisClient();
+    await redis.incrby(REDIS_KEYS.notifUnread(userId.toString()), amount);
+  } catch (err) {
+    console.error('[NotificationService] incrUnread error:', err.message);
   }
 }
 
 /**
- * Emit a real-time notification to a single user's personal socket room.
- *
- * @param {import('socket.io').Server} io
- * @param {string|import('mongoose').ObjectId} userId
- * @param {object} notification - the saved Mongoose document
+ * Decrement the unread counter by 1, floored at 0.
+ * Uses a Lua script so the clamp is atomic — no race condition where
+ * concurrent decrements could push the counter below zero.
  */
+async function decrUnread(userId) {
+  try {
+    const redis = getRedisClient();
+    const key   = REDIS_KEYS.notifUnread(userId.toString());
+    // Atomic: get current value, decrement only if > 0
+    const lua = `
+      local v = redis.call('GET', KEYS[1])
+      if not v then return 0 end
+      local n = tonumber(v)
+      if n <= 0 then return 0 end
+      return redis.call('DECRBY', KEYS[1], 1)
+    `;
+    await redis.eval(lua, 1, key);
+  } catch (err) {
+    console.error('[NotificationService] decrUnread error:', err.message);
+  }
+}
+
+/**
+ * Reset unread counter to 0 by deleting the key.
+ * Next GET /api/notifications will re-seed from MongoDB if needed.
+ */
+async function resetUnread(userId) {
+  try {
+    const redis = getRedisClient();
+    await redis.del(REDIS_KEYS.notifUnread(userId.toString()));
+  } catch (err) {
+    console.error('[NotificationService] resetUnread error:', err.message);
+  }
+}
+
+/**
+ * Get the cached unread count.
+ * Returns the cached integer if the key exists, or null on miss/error.
+ * The route handler falls back to MongoDB countDocuments on null.
+ */
+async function getCachedUnread(userId) {
+  try {
+    const redis = getRedisClient();
+    const raw   = await redis.get(REDIS_KEYS.notifUnread(userId.toString()));
+    return raw !== null ? Math.max(0, parseInt(raw, 10)) : null;
+  } catch (err) {
+    console.error('[NotificationService] getCachedUnread error:', err.message);
+    return null;
+  }
+}
+
+// ── Socket helpers ────────────────────────────────────────────────────────────
+
+function getIO(app) {
+  try { return app?.get('io') || null; } catch { return null; }
+}
+
 function emitToUser(io, userId, notification) {
   if (!io) return;
   try {
@@ -56,37 +117,29 @@ function emitToUser(io, userId, notification) {
   }
 }
 
-/**
- * Enforce the per-user notification cap.
- * Deletes oldest notifications beyond MAX_NOTIFICATIONS_PER_USER.
- * Called asynchronously — never awaited by the main flow.
- *
- * @param {string|import('mongoose').ObjectId} userId
- */
+// ── Cap enforcement ───────────────────────────────────────────────────────────
+
 async function enforceCapForUser(userId) {
   try {
     const count = await Notification.countDocuments({ userId });
     if (count > MAX_NOTIFICATIONS_PER_USER) {
       const overflow = count - MAX_NOTIFICATIONS_PER_USER;
-      const oldest = await Notification.find({ userId })
+      const oldest   = await Notification.find({ userId })
         .sort({ createdAt: 1 })
         .limit(overflow)
         .select('_id');
-      const ids = oldest.map((n) => n._id);
-      await Notification.deleteMany({ _id: { $in: ids } });
+      await Notification.deleteMany({ _id: { $in: oldest.map((n) => n._id) } });
     }
   } catch (err) {
     console.error('[NotificationService] Cap enforcement error:', err.message);
   }
 }
 
+// ── Public API ────────────────────────────────────────────────────────────────
+
 /**
  * Create a single notification for one user.
- *
- * @param {import('express').Application} app  - Express app (for socket access)
- * @param {string|import('mongoose').ObjectId} userId
- * @param {{ type: string, message: string, link?: string, metadata?: object }} data
- * @returns {Promise<import('mongoose').Document|null>}
+ * 🔹 Increments Redis unread counter by 1 after DB insert.
  */
 async function createNotification(app, userId, data) {
   try {
@@ -98,11 +151,13 @@ async function createNotification(app, userId, data) {
       metadata: data.metadata || {},
     });
 
-    // Real-time push
+    // 🔹 Increment Redis counter
+    await incrUnread(userId);
+
+    // Real-time socket push
     const io = getIO(app);
     emitToUser(io, userId, notification);
 
-    // Enforce cap asynchronously (don't block the response)
     enforceCapForUser(userId).catch(() => {});
 
     return notification;
@@ -114,17 +169,11 @@ async function createNotification(app, userId, data) {
 
 /**
  * Create notifications for multiple users at once (bulk insert).
- * Uses insertMany for performance — one DB round-trip regardless of user count.
- *
- * @param {import('express').Application} app
- * @param {Array<string|import('mongoose').ObjectId>} userIds
- * @param {{ type: string, message: string, link?: string, metadata?: object }} data
- * @returns {Promise<void>}
+ * 🔹 Increments each user's Redis counter by 1 via INCRBY.
  */
 async function createBulkNotifications(app, userIds, data) {
   if (!userIds || userIds.length === 0) return;
 
-  // Deduplicate ids
   const uniqueIds = [...new Set(userIds.map((id) => id.toString()))];
 
   try {
@@ -139,7 +188,11 @@ async function createBulkNotifications(app, userIds, data) {
 
     const inserted = await Notification.insertMany(docs, { ordered: false });
 
-    // Real-time push to each user's personal room
+    // 🔹 Increment each user's Redis counter (fire-and-forget, non-fatal)
+    // Each user gets exactly 1 new unread notification from this bulk insert.
+    uniqueIds.forEach((userId) => incrUnread(userId, 1).catch(() => {}));
+
+    // Real-time socket push
     const io = getIO(app);
     if (io) {
       inserted.forEach((notification) => {
@@ -147,7 +200,6 @@ async function createBulkNotifications(app, userIds, data) {
       });
     }
 
-    // Enforce cap for each user asynchronously
     uniqueIds.forEach((userId) => {
       enforceCapForUser(userId).catch(() => {});
     });
@@ -156,4 +208,12 @@ async function createBulkNotifications(app, userIds, data) {
   }
 }
 
-module.exports = { createNotification, createBulkNotifications };
+// Export helpers so notificationRoutes can use them directly
+module.exports = {
+  createNotification,
+  createBulkNotifications,
+  // 🔹 exported for use in notificationRoutes.js
+  getCachedUnread,
+  decrUnread,
+  resetUnread,
+};

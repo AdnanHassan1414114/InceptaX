@@ -1,21 +1,48 @@
+/**
+ * routes/userRoutes.js  — with Zod validation
+ */
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
+
 const {
   getMe,
   updateProfile,
   getUserByUsername,
   getUserSubmissions,
-  getUserStats,       // 🔹 NEW
+  getUserStats,
 } = require('../controllers/userController');
+
 const authMiddleware = require('../middleware/authMiddleware');
+const validate       = require('../validators/validate');
+const userSchemas    = require('../validators/userValidators');
 
 router.get('/me', authMiddleware, getMe);
-router.put('/me/profile', authMiddleware, updateProfile);
 
-// NOTE: /me routes must be declared before /:username to avoid "me" being
-// treated as a username param — already the case, keeping it explicit.
-router.get('/:username', authMiddleware, getUserByUsername);
-router.get('/:username/submissions', authMiddleware, getUserSubmissions);
-router.get('/:username/stats', authMiddleware, getUserStats); // 🔹 NEW
+router.put(
+  '/me/profile',
+  authMiddleware,
+  validate(userSchemas.updateProfile),       // body
+  updateProfile
+);
+
+// NOTE: /me routes declared before /:username to avoid shadowing
+router.get(
+  '/:username',
+  authMiddleware,
+  validate(userSchemas.usernameParam, 'params'),
+  getUserByUsername
+);
+router.get(
+  '/:username/submissions',
+  authMiddleware,
+  validate(userSchemas.usernameParam, 'params'),
+  getUserSubmissions
+);
+router.get(
+  '/:username/stats',
+  authMiddleware,
+  validate(userSchemas.usernameParam, 'params'),
+  getUserStats
+);
 
 module.exports = router;

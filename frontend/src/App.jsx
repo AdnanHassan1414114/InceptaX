@@ -12,8 +12,8 @@ import Navbar from "./components/Navbar";
 import Home from "./pages/user/Home";
 import Login from "./pages/user/Login";
 import OAuthCallback from "./pages/user/OAuthCallback";
-import ForgotPassword from "./pages/user/ForgotPassword"; // 🔹 NEW
-import ResetPassword from "./pages/user/ResetPassword";   // 🔹 NEW
+import ForgotPassword from "./pages/user/ForgotPassword";
+import ResetPassword from "./pages/user/ResetPassword";
 import Dashboard from "./pages/user/Dashboard";
 import Challenges from "./pages/user/Challenges";
 import ChallengeDetail from "./pages/user/ChallengeDetail";
@@ -76,30 +76,28 @@ const UserApp = () => (
       <Routes>
         <Route path="/" element={<Home />} />
 
-        {/* Auth — public only (redirect logged-in users) */}
-        <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-
-        {/* Password reset — public, no guard needed */}
-        <Route path="/forgot-password" element={<ForgotPassword />} />  {/* 🔹 NEW */}
-        <Route path="/reset-password"  element={<ResetPassword />} />   {/* 🔹 NEW */}
+        {/* Auth routes — public only */}
+        <Route path="/login"          element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password"  element={<ResetPassword />} />
 
         {/* OAuth callback — no guard, handles own redirect */}
-        <Route path="/auth/callback" element={<OAuthCallback />} />
+        <Route path="/auth/callback"  element={<OAuthCallback />} />
 
-        {/* Main app */}
-        <Route path="/challenges" element={<Challenges />} />
-        <Route path="/challenges/:id" element={<ChallengeDetail />} />
-        <Route path="/challenges/:id/submit" element={<PrivateRoute><SubmitProject /></PrivateRoute>} />
-        <Route path="/challenges/:id/teams" element={<PrivateRoute><TeamsByChallenge /></PrivateRoute>} />
-        <Route path="/submissions/:id" element={<PrivateRoute><SubmissionDetail /></PrivateRoute>} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
-        <Route path="/leaderboard/challenge/:id" element={<ProjectLeaderboard />} />
-        <Route path="/u/:username" element={<Profile />} />
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/team/:teamId" element={<PrivateRoute><Team /></PrivateRoute>} />
-        <Route path="/admin" element={<UserAdminRoute><AdminPanel /></UserAdminRoute>} />
-        <Route path="/notifications" element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
+        {/* App routes */}
+        <Route path="/challenges"                  element={<Challenges />} />
+        <Route path="/challenges/:id"              element={<ChallengeDetail />} />
+        <Route path="/challenges/:id/submit"       element={<PrivateRoute><SubmitProject /></PrivateRoute>} />
+        <Route path="/challenges/:id/teams"        element={<PrivateRoute><TeamsByChallenge /></PrivateRoute>} />
+        <Route path="/submissions/:id"             element={<PrivateRoute><SubmissionDetail /></PrivateRoute>} />
+        <Route path="/leaderboard"                 element={<Leaderboard />} />
+        <Route path="/leaderboard/challenge/:id"   element={<ProjectLeaderboard />} />
+        <Route path="/u/:username"                 element={<Profile />} />
+        <Route path="/pricing"                     element={<Pricing />} />
+        <Route path="/dashboard"                   element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/team/:teamId"                element={<PrivateRoute><Team /></PrivateRoute>} />
+        <Route path="/admin"                       element={<UserAdminRoute><AdminPanel /></UserAdminRoute>} />
+        <Route path="/notifications"               element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -107,7 +105,7 @@ const UserApp = () => (
   </div>
 );
 
-// ─── Admin Portal App (unchanged) ─────────────────────────────────────────────
+// ─── Admin Portal App ─────────────────────────────────────────────────────────
 const AdminPortalApp = () => (
   <Routes>
     <Route path="login" element={<AdminLogin />} />
@@ -115,12 +113,12 @@ const AdminPortalApp = () => (
       <AdminRoute>
         <AdminLayout>
           <Routes>
-            <Route path="/" element={<AdminOverview />} />
-            <Route path="/challenges" element={<AdminChallenges />} />
+            <Route path="/"            element={<AdminOverview />} />
+            <Route path="/challenges"  element={<AdminChallenges />} />
             <Route path="/submissions" element={<AdminSubmissions />} />
-            <Route path="/users" element={<AdminUsers />} />
-            <Route path="/email" element={<AdminEmailBlast />} />
-            <Route path="*" element={<Navigate to="/admin-portal" replace />} />
+            <Route path="/users"       element={<AdminUsers />} />
+            <Route path="/email"       element={<AdminEmailBlast />} />
+            <Route path="*"            element={<Navigate to="/admin-portal" replace />} />
           </Routes>
         </AdminLayout>
       </AdminRoute>
@@ -128,6 +126,7 @@ const AdminPortalApp = () => (
   </Routes>
 );
 
+// ─── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
   return (
     <BrowserRouter>
@@ -139,7 +138,7 @@ export default function App() {
                 <ChatProvider>
                   <Routes>
                     <Route path="/admin-portal/*" element={<AdminPortalApp />} />
-                    <Route path="/*" element={<UserApp />} />
+                    <Route path="/*"              element={<UserApp />} />
                   </Routes>
                   <Toaster
                     position="top-right"

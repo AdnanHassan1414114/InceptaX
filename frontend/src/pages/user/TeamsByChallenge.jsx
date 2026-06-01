@@ -5,34 +5,268 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/api";
 import toast from "react-hot-toast";
 
-// ─── Shared status styles (identical to TeamPage.jsx) ────────────────────────
-const STATUS_STYLE = {
-  Planning:  { color: "var(--blue)",    border: "rgba(96,165,250,0.3)",   bg: "rgba(96,165,250,0.06)"   },
-  Building:  { color: "var(--emerald)", border: "rgba(74,222,128,0.3)",   bg: "rgba(74,222,128,0.06)"   },
-  Completed: { color: "var(--text3)",   border: "var(--border)",          bg: "var(--bg3)"              },
-};
+/* ── Styles ──────────────────────────────────────────────────────── */
+const css = `
+  .tbc-root {
+    --bg: #ffffff;
+    --fg: #000000;
+    --border: #000000;
+    --text1: #000000;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .dark .tbc-root,
+  [data-theme="dark"] .tbc-root {
+    --bg: #000000;
+    --fg: #ffffff;
+    --border: #ffffff;
+    --text1: #ffffff;
+  }
+  .tbc-root * { box-sizing: border-box; }
 
-const Avatar = ({ name, profileImage, size = 24, radius = 6 }) => (
+  /* Back link */
+  .tbc-back {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fg);
+    text-decoration: none;
+    opacity: 0.45;
+    display: inline-block;
+    margin-bottom: 24px;
+  }
+  .tbc-back:hover { opacity: 1; }
+
+  /* Filter buttons */
+  .tbc-filter-btn {
+    height: 36px;
+    padding: 0 16px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    color: var(--fg);
+    white-space: nowrap;
+  }
+  .tbc-filter-btn.active {
+    background: var(--fg);
+    color: var(--bg);
+  }
+
+  /* Badge */
+  .tbc-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1.5px solid var(--border);
+    color: var(--text1);
+    background: var(--bg);
+    border-radius: 0;
+    white-space: nowrap;
+  }
+
+  /* Tag (roles) */
+  .tbc-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+    padding: 0 7px;
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text1);
+    border: 1.5px solid var(--border);
+    background: var(--bg);
+    border-radius: 0;
+    opacity: 0.55;
+  }
+
+  /* Card */
+  .tbc-card {
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Buttons */
+  .tbc-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    padding: 0 14px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    background: var(--fg);
+    color: var(--bg);
+    border: 1.5px solid var(--border);
+    cursor: pointer;
+    flex: 1;
+    white-space: nowrap;
+    transition: opacity 0.12s;
+  }
+  .tbc-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .tbc-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 34px;
+    padding: 0 14px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1.5px solid var(--border);
+    cursor: pointer;
+    flex: 1;
+    white-space: nowrap;
+    transition: background 0.12s, color 0.12s;
+  }
+  .tbc-btn-ghost:hover:not(:disabled) { background: var(--fg); color: var(--bg); }
+  .tbc-btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Header action buttons (larger) */
+  .tbc-hdr-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 20px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    background: var(--fg);
+    color: var(--bg);
+    border: 1.5px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tbc-hdr-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 20px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1.5px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s, color 0.12s;
+  }
+  .tbc-hdr-btn-ghost:hover { background: var(--fg); color: var(--bg); }
+
+  /* Pagination */
+  .tbc-page-btn {
+    height: 36px;
+    padding: 0 18px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1.5px solid var(--border);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+  }
+  .tbc-page-btn:hover:not(:disabled) { background: var(--fg); color: var(--bg); }
+  .tbc-page-btn:disabled { opacity: 0.2; cursor: not-allowed; }
+
+  /* Skeleton */
+  .tbc-skeleton {
+    border: 1.5px solid var(--border);
+    background: var(--fg);
+    animation: tbc-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes tbc-pulse {
+    0%, 100% { opacity: 0.06; }
+    50% { opacity: 0.14; }
+  }
+
+  /* Modal backdrop */
+  .tbc-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .tbc-modal {
+    width: 100%;
+    max-width: 420px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    padding: 28px 24px;
+  }
+  .tbc-modal-input {
+    width: 100%;
+    height: 40px;
+    padding: 0 14px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1.5px solid var(--border);
+    outline: none;
+    margin-top: 6px;
+  }
+  .tbc-modal-input:focus { outline: 2px solid var(--fg); outline-offset: 1px; }
+  .tbc-modal-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text1);
+    opacity: 0.5;
+  }
+`;
+
+/* ── Avatar ──────────────────────────────────────────────────────── */
+const Avatar = ({ name, profileImage, size = 24 }) => (
   <img
-    src={
-      profileImage ||
-      `https://api.dicebear.com/7.x/initials/svg?seed=${name || "U"}&backgroundColor=111111&textColor=ffffff`
-    }
-    style={{ width: size, height: size, borderRadius: radius, flexShrink: 0 }}
+    src={profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${name || "U"}&backgroundColor=111111&textColor=ffffff`}
+    style={{ width: size, height: size, borderRadius: 0, border: "1.5px solid var(--border)", flexShrink: 0 }}
     alt={name || ""}
   />
 );
 
-const StatusBadge = ({ status }) => {
-  const s = STATUS_STYLE[status] || STATUS_STYLE.Planning;
-  return (
-    <span style={{ fontSize: 10, fontFamily: "monospace", color: s.color, border: `0.5px solid ${s.border}`, background: s.bg, padding: "2px 8px", borderRadius: 100 }}>
-      {status}
-    </span>
-  );
-};
-
-// ─── Create Team Modal ────────────────────────────────────────────────────────
+/* ── Create Team Modal ───────────────────────────────────────────── */
 function CreateTeamModal({ challengeId, onClose, onCreated }) {
   const [form, setForm] = useState({ teamName: "", maxMembers: 3 });
   const [loading, setLoading] = useState(false);
@@ -42,91 +276,35 @@ function CreateTeamModal({ challengeId, onClose, onCreated }) {
     if (!form.teamName.trim()) { toast.error("Team name is required"); return; }
     setLoading(true);
     try {
-      const res = await api.post("/teams", {
-        teamName:   form.teamName.trim(),
-        challengeId,
-        maxMembers: Number(form.maxMembers),
-      });
+      const res = await api.post("/teams", { teamName: form.teamName.trim(), challengeId, maxMembers: Number(form.maxMembers) });
       toast.success("Team created! 🎉");
       onCreated(res.data.data.team);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to create team");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
-    // Backdrop
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 100,
-        background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      {/* Modal card — stop propagation so clicking inside doesn't close */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="ix-card"
-        style={{ width: "100%", maxWidth: 420, padding: "28px 24px" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 500, color: "var(--text1)", margin: 0 }}>
-            Create a Team
-          </h2>
-          <button
-            onClick={onClose}
-            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text2)", fontSize: 20, lineHeight: 1, padding: 0 }}
-          >
-            ×
-          </button>
+    <div className="tbc-modal-backdrop" onClick={onClose}>
+      <div className="tbc-modal" onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text1)", margin: 0, letterSpacing: "-0.02em" }}>Create a Team</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text1)", fontSize: 22, lineHeight: 1, padding: 0, opacity: 0.5 }}>×</button>
         </div>
-
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <label className="ix-label">Team Name *</label>
-            <input
-              className="ix-input"
-              placeholder="e.g. ByteBuilders"
-              value={form.teamName}
-              onChange={(e) => setForm({ ...form, teamName: e.target.value })}
-              maxLength={60}
-              required
-            />
+            <label className="tbc-modal-label">Team Name *</label>
+            <input className="tbc-modal-input" placeholder="e.g. ByteBuilders" value={form.teamName} onChange={(e) => setForm({ ...form, teamName: e.target.value })} maxLength={60} required />
           </div>
-
           <div>
-            <label className="ix-label">Max Members (2–10)</label>
-            <input
-              className="ix-input"
-              type="number"
-              min={2}
-              max={10}
-              value={form.maxMembers}
-              onChange={(e) => setForm({ ...form, maxMembers: e.target.value })}
-            />
+            <label className="tbc-modal-label">Max Members (2–10)</label>
+            <input className="tbc-modal-input" type="number" min={2} max={10} value={form.maxMembers} onChange={(e) => setForm({ ...form, maxMembers: e.target.value })} />
           </div>
-
           <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary"
-              style={{ flex: 1, padding: "10px", fontSize: 13, opacity: loading ? 0.6 : 1 }}
-            >
+            <button type="submit" disabled={loading} className="tbc-hdr-btn-primary" style={{ flex: 1, justifyContent: "center", opacity: loading ? 0.6 : 1 }}>
               {loading ? "Creating…" : "Create Team →"}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-ghost"
-              style={{ padding: "10px 16px", fontSize: 13 }}
-            >
-              Cancel
-            </button>
+            <button type="button" onClick={onClose} className="tbc-hdr-btn-ghost" style={{ flex: 0 }}>Cancel</button>
           </div>
         </form>
       </div>
@@ -134,36 +312,28 @@ function CreateTeamModal({ challengeId, onClose, onCreated }) {
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+/* ── Main ────────────────────────────────────────────────────────── */
 export default function TeamsByChallenge() {
   const { id: challengeId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [challenge, setChallenge]   = useState(null);
-  const [teams, setTeams]           = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState(null);
-  const [pagination, setPagination] = useState({ totalPages: 1 });
-  const [page, setPage]             = useState(1);
+  const [challenge, setChallenge]       = useState(null);
+  const [teams, setTeams]               = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState(null);
+  const [pagination, setPagination]     = useState({ totalPages: 1 });
+  const [page, setPage]                 = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showModal, setShowModal]   = useState(false);
+  const [showModal, setShowModal]       = useState(false);
+  const [joiningId, setJoiningId]       = useState(null);
 
-  // Per-card join request loading state: { [teamId]: bool }
-  const [joiningId, setJoiningId]   = useState(null);
+  const isPremiumActive = user && user.plan !== "free" && user.planExpiresAt && new Date() < new Date(user.planExpiresAt);
 
-  // ── Premium check (same formula as every other page) ──────────────────────
-  const isPremiumActive = user &&
-    user.plan !== "free" &&
-    user.planExpiresAt &&
-    new Date() < new Date(user.planExpiresAt);
-
-  // ── Fetch challenge + teams ───────────────────────────────────────────────
   const fetchData = useCallback(() => {
     setLoading(true);
     const params = { page, limit: 9 };
     if (statusFilter !== "all") params.status = statusFilter;
-
     Promise.all([
       api.get(`/assignments/${challengeId}`),
       api.get(`/teams/challenge/${challengeId}`, { params }),
@@ -179,322 +349,197 @@ export default function TeamsByChallenge() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // ── Join request ──────────────────────────────────────────────────────────
   const handleRequestJoin = async (team) => {
     if (!user) { navigate("/login"); return; }
     setJoiningId(team._id);
     try {
       await api.post(`/teams/${team._id}/request`);
       toast.success("Join request sent!");
-      // Optimistically mark hasRequested
-      setTeams((prev) =>
-        prev.map((t) => t._id === team._id ? { ...t, hasRequested: true } : t)
-      );
+      setTeams((prev) => prev.map((t) => t._id === team._id ? { ...t, hasRequested: true } : t));
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to send request");
-    } finally {
-      setJoiningId(null);
-    }
+    } finally { setJoiningId(null); }
   };
 
-  // ── On team created via modal ─────────────────────────────────────────────
-  const handleCreated = (newTeam) => {
-    setShowModal(false);
-    navigate(`/team/${newTeam._id}`);
-  };
+  const handleCreated = (newTeam) => { setShowModal(false); navigate(`/team/${newTeam._id}`); };
 
-  // ── Filter buttons ────────────────────────────────────────────────────────
-  const FilterBtn = ({ value, label }) => (
-    <button
-      onClick={() => { setStatusFilter(value); setPage(1); }}
-      style={{
-        padding: "6px 14px",
-        borderRadius: 8,
-        fontSize: 12,
-        border: `0.5px solid ${statusFilter === value ? "var(--border2)" : "var(--border)"}`,
-        background: statusFilter === value ? "var(--bg3)" : "var(--bg2)",
-        color: statusFilter === value ? "var(--text1)" : "var(--text2)",
-        cursor: "pointer",
-        transition: "all 0.15s",
-      }}
-    >
-      {label}
-    </button>
+  if (loading) return (
+    <>
+      <style>{css}</style>
+      <div className="tbc-root" style={{ maxWidth: 960, margin: "0 auto", padding: "48px 20px" }}>
+        <div className="tbc-skeleton" style={{ height: 60, marginBottom: 20 }} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          {Array(6).fill(0).map((_, i) => <div key={i} className="tbc-skeleton" style={{ height: 180 }} />)}
+        </div>
+      </div>
+    </>
   );
 
-  // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading)
-    return (
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 16px" }}>
-        <div className="skeleton" style={{ height: 56, borderRadius: 14, marginBottom: 20 }} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 10 }}>
-          {Array(6).fill(0).map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: 160, borderRadius: 14 }} />
-          ))}
+  if (error) return (
+    <>
+      <style>{css}</style>
+      <div className="tbc-root" style={{ maxWidth: 960, margin: "0 auto", padding: "48px 20px", textAlign: "center" }}>
+        <div style={{ border: "1.5px solid var(--border)", padding: 48 }}>
+          <p style={{ color: "var(--text1)", opacity: 0.6, marginBottom: 20 }}>{error}</p>
+          <Link to={`/challenges/${challengeId}`} className="tbc-hdr-btn-ghost">← Back to Challenge</Link>
         </div>
       </div>
-    );
-
-  // ── Error ──────────────────────────────────────────────────────────────────
-  if (error)
-    return (
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 16px", textAlign: "center" }}>
-        <div className="ix-card" style={{ padding: 40 }}>
-          <p style={{ color: "var(--red)", marginBottom: 16 }}>{error}</p>
-          <Link to={`/challenges/${challengeId}`} className="btn-ghost">← Back to Challenge</Link>
-        </div>
-      </div>
-    );
+    </>
+  );
 
   const expired = challenge ? isPast(new Date(challenge.deadline)) : false;
 
   return (
-    <div className="page-enter" style={{ maxWidth: 900, margin: "0 auto", padding: "40px 16px" }}>
+    <>
+      <style>{css}</style>
+      <div className="tbc-root" style={{ maxWidth: 960, margin: "0 auto", padding: "48px 20px" }}>
 
-      {/* ── Back link ────────────────────────────────────────────────────────── */}
-      <Link
-        to={`/challenges/${challengeId}`}
-        style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text2)", textDecoration: "none", display: "inline-block", marginBottom: 20 }}
-      >
-        ← {challenge?.title || "Challenge"}
-      </Link>
+        {/* Back */}
+        <Link to={`/challenges/${challengeId}`} className="tbc-back">
+          ← {challenge?.title || "Challenge"}
+        </Link>
 
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: "var(--text1)", margin: "0 0 4px", letterSpacing: "-0.4px" }}>
-            Teams
-          </h1>
-          <p style={{ fontSize: 13, color: "var(--text2)", margin: 0 }}>
-            {pagination.total ?? teams.length} team{(pagination.total ?? teams.length) !== 1 ? "s" : ""} for{" "}
-            <span style={{ color: "var(--text1)" }}>{challenge?.title}</span>
-          </p>
-        </div>
-
-        {/* Create Team button — premium only, challenge not expired */}
-        {user && !expired && (
-          isPremiumActive ? (
-            <button
-              onClick={() => setShowModal(true)}
-              className="btn-primary"
-              style={{ fontSize: 13 }}
-            >
-              + Create Team
-            </button>
-          ) : (
-            <Link to="/pricing" className="btn-ghost" style={{ fontSize: 13 }}>
-              ✦ Upgrade to Create Team
-            </Link>
-          )
-        )}
-        {!user && (
-          <Link to="/login" className="btn-primary" style={{ fontSize: 13 }}>
-            Sign in →
-          </Link>
-        )}
-      </div>
-
-      {/* ── Status filter bar ─────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-        <FilterBtn value="all"       label="All"       />
-        <FilterBtn value="Planning"  label="Planning"  />
-        <FilterBtn value="Building"  label="Building"  />
-        <FilterBtn value="Completed" label="Completed" />
-      </div>
-
-      {/* ── Teams grid ───────────────────────────────────────────────────────── */}
-      {teams.length === 0 ? (
-        <div className="ix-card" style={{ padding: "56px 24px", textAlign: "center" }}>
-          <p style={{ color: "var(--text2)", fontSize: 14, marginBottom: 16 }}>
-            No teams yet for this challenge.
-          </p>
-          {user && isPremiumActive && !expired && (
-            <button onClick={() => setShowModal(true)} className="btn-primary" style={{ fontSize: 13 }}>
-              + Create the first team
-            </button>
-          )}
-          {user && !isPremiumActive && !expired && (
-            <Link to="/pricing" className="btn-ghost" style={{ fontSize: 13 }}>
-              ✦ Upgrade to create a team
-            </Link>
-          )}
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(265px,1fr))", gap: 10 }}>
-            {teams.map((team) => {
-              const isFull       = team.openSpots <= 0;
-              const isJoining    = joiningId === team._id;
-              const canRequest   = user && !team.isMember && !team.isCreator &&
-                                   !team.hasRequested && !isFull &&
-                                   team.status !== "Completed" && !expired;
-
-              return (
-                <div
-                  key={team._id}
-                  className="ix-card"
-                  style={{ padding: "18px", display: "flex", flexDirection: "column", gap: 12 }}
-                >
-                  {/* Card top: status + full badge */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <StatusBadge status={team.status} />
-                    {isFull && (
-                      <span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--text3)", border: "0.5px solid var(--border)", padding: "2px 8px", borderRadius: 100 }}>
-                        Full
-                      </span>
-                    )}
-                    {team.isCreator && (
-                      <span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--amber)", border: "0.5px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.06)", padding: "2px 8px", borderRadius: 100 }}>
-                        Your Team
-                      </span>
-                    )}
-                    {team.isMember && !team.isCreator && (
-                      <span style={{ fontSize: 10, fontFamily: "monospace", color: "var(--emerald)", border: "0.5px solid rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.06)", padding: "2px 8px", borderRadius: 100 }}>
-                        Member
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Team name */}
-                  <div>
-                    <h3 style={{ fontSize: 14, fontWeight: 500, color: "var(--text1)", margin: "0 0 4px" }}>
-                      {team.teamName}
-                    </h3>
-                    <p style={{ fontSize: 11, fontFamily: "monospace", color: "var(--text3)", margin: 0 }}>
-                      Led by @{team.createdBy?.username}
-                    </p>
-                  </div>
-
-                  {/* Members row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {/* Stacked avatars */}
-                    <div style={{ display: "flex" }}>
-                      {team.members?.slice(0, 4).map((m, i) => (
-                        <Avatar
-                          key={m._id}
-                          name={m.name}
-                          profileImage={m.profileImage}
-                          size={24}
-                          radius={6}
-                          style={{ marginLeft: i > 0 ? -6 : 0 }}
-                        />
-                      ))}
-                    </div>
-                    <span style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text2)" }}>
-                      {team.members?.length} / {team.maxMembers}
-                    </span>
-                    {!isFull && (
-                      <span style={{ fontSize: 11, color: "var(--emerald)" }}>
-                        · {team.openSpots} open
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Required roles */}
-                  {team.requiredRoles?.length > 0 && (
-                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                      {team.requiredRoles.map((role) => (
-                        <span
-                          key={role}
-                          style={{ fontSize: 10, fontFamily: "monospace", color: "var(--violet)", border: "0.5px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.06)", padding: "2px 7px", borderRadius: 100 }}
-                        >
-                          {role}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Action buttons */}
-                  <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-                    <Link
-                      to={`/team/${team._id}`}
-                      className="btn-ghost"
-                      style={{ fontSize: 12, flex: 1, textAlign: "center" }}
-                    >
-                      View Team
-                    </Link>
-
-                    {/* Request to Join */}
-                    {canRequest && (
-                      <button
-                        onClick={() => handleRequestJoin(team)}
-                        disabled={isJoining}
-                        className="btn-primary"
-                        style={{ fontSize: 12, flex: 1, opacity: isJoining ? 0.6 : 1 }}
-                      >
-                        {isJoining ? "Sending…" : "Request to Join"}
-                      </button>
-                    )}
-
-                    {/* Already requested */}
-                    {user && team.hasRequested && !team.isMember && !team.isCreator && (
-                      <span
-                        style={{ fontSize: 12, flex: 1, textAlign: "center", padding: "8px 0", fontFamily: "monospace", color: "var(--text3)" }}
-                      >
-                        Requested ✓
-                      </span>
-                    )}
-
-                    {/* Full message */}
-                    {user && isFull && !team.isMember && !team.isCreator && (
-                      <span
-                        style={{ fontSize: 12, flex: 1, textAlign: "center", padding: "8px 0", fontFamily: "monospace", color: "var(--text3)" }}
-                      >
-                        Team Full
-                      </span>
-                    )}
-
-                    {/* Not logged in */}
-                    {!user && (
-                      <Link
-                        to="/login"
-                        className="btn-primary"
-                        style={{ fontSize: 12, flex: 1, textAlign: "center" }}
-                      >
-                        Sign in
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 700, color: "var(--text1)", margin: "0 0 6px", letterSpacing: "-0.03em" }}>Teams</h1>
+            <p style={{ fontSize: 13, color: "var(--text1)", margin: 0, opacity: 0.5 }}>
+              {pagination.total ?? teams.length} team{(pagination.total ?? teams.length) !== 1 ? "s" : ""} for{" "}
+              <span style={{ opacity: 1, fontWeight: 600 }}>{challenge?.title}</span>
+            </p>
           </div>
+          <div>
+            {user && !expired && (isPremiumActive ? (
+              <button onClick={() => setShowModal(true)} className="tbc-hdr-btn-primary">+ Create Team</button>
+            ) : (
+              <Link to="/pricing" className="tbc-hdr-btn-ghost">✦ Upgrade to Create</Link>
+            ))}
+            {!user && <Link to="/login" className="tbc-hdr-btn-primary">Sign in →</Link>}
+          </div>
+        </div>
 
-          {/* ── Pagination ─────────────────────────────────────────────────── */}
-          {pagination.totalPages > 1 && (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 12, marginTop: 28 }}>
-              <button
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="btn-ghost"
-                style={{ fontSize: 12, opacity: page === 1 ? 0.3 : 1 }}
-              >
-                ← Prev
-              </button>
-              <span style={{ fontSize: 12, fontFamily: "monospace", color: "var(--text2)" }}>
-                {page} / {pagination.totalPages}
-              </span>
-              <button
-                disabled={page === pagination.totalPages}
-                onClick={() => setPage((p) => p + 1)}
-                className="btn-ghost"
-                style={{ fontSize: 12, opacity: page === pagination.totalPages ? 0.3 : 1 }}
-              >
-                Next →
-              </button>
+        {/* Filter bar */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+          {["all", "Planning", "Building", "Completed"].map((val) => (
+            <button
+              key={val}
+              className={`tbc-filter-btn${statusFilter === val ? " active" : ""}`}
+              onClick={() => { setStatusFilter(val); setPage(1); }}
+            >
+              {val === "all" ? "All" : val}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid */}
+        {teams.length === 0 ? (
+          <div style={{ border: "1.5px solid var(--border)", padding: "56px 24px", textAlign: "center" }}>
+            <p style={{ fontSize: 13, color: "var(--text1)", opacity: 0.45, marginBottom: 20 }}>No teams yet for this challenge.</p>
+            {user && isPremiumActive && !expired && (
+              <button onClick={() => setShowModal(true)} className="tbc-hdr-btn-primary">+ Create the first team</button>
+            )}
+            {user && !isPremiumActive && !expired && (
+              <Link to="/pricing" className="tbc-hdr-btn-ghost">✦ Upgrade to create a team</Link>
+            )}
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+              {teams.map((team) => {
+                const isFull     = team.openSpots <= 0;
+                const isJoining  = joiningId === team._id;
+                const canRequest = user && !team.isMember && !team.isCreator && !team.hasRequested && !isFull && team.status !== "Completed" && !expired;
+
+                return (
+                  <div key={team._id} className="tbc-card">
+                    {/* Badges */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, flexWrap: "wrap" }}>
+                      <span className="tbc-badge">{team.status}</span>
+                      <div style={{ display: "flex", gap: 5 }}>
+                        {isFull && <span className="tbc-badge">Full</span>}
+                        {team.isCreator && <span className="tbc-badge">Your Team</span>}
+                        {team.isMember && !team.isCreator && <span className="tbc-badge">Member</span>}
+                      </div>
+                    </div>
+
+                    {/* Name + leader */}
+                    <div>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)", margin: "0 0 4px", letterSpacing: "-0.01em" }}>
+                        {team.teamName}
+                      </h3>
+                      <p style={{ fontSize: 11, color: "var(--text1)", opacity: 0.4, margin: 0 }}>
+                        Led by @{team.createdBy?.username}
+                      </p>
+                    </div>
+
+                    {/* Members */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", gap: 3 }}>
+                        {team.members?.slice(0, 4).map((m) => (
+                          <Avatar key={m._id} name={m.name} profileImage={m.profileImage} size={22} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text1)" }}>
+                        {team.members?.length} / {team.maxMembers}
+                      </span>
+                      {!isFull && (
+                        <span style={{ fontSize: 11, color: "var(--text1)", opacity: 0.4 }}>
+                          · {team.openSpots} open
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Required roles */}
+                    {team.requiredRoles?.length > 0 && (
+                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                        {team.requiredRoles.map((role) => (
+                          <span key={role} className="tbc-tag">{role}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+                      <Link to={`/team/${team._id}`} className="tbc-btn-ghost">View Team</Link>
+                      {canRequest && (
+                        <button onClick={() => handleRequestJoin(team)} disabled={isJoining} className="tbc-btn-primary">
+                          {isJoining ? "Sending…" : "Request →"}
+                        </button>
+                      )}
+                      {user && team.hasRequested && !team.isMember && !team.isCreator && (
+                        <span style={{ flex: 1, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", textAlign: "center", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text1)", opacity: 0.4 }}>
+                          Requested ✓
+                        </span>
+                      )}
+                      {user && isFull && !team.isMember && !team.isCreator && !team.hasRequested && (
+                        <span style={{ flex: 1, fontSize: 11, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", textAlign: "center", padding: "0 8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text1)", opacity: 0.4 }}>
+                          Team Full
+                        </span>
+                      )}
+                      {!user && <Link to="/login" className="tbc-btn-primary">Sign in</Link>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </>
-      )}
 
-      {/* ── Create Team Modal ─────────────────────────────────────────────────── */}
-      {showModal && (
-        <CreateTeamModal
-          challengeId={challengeId}
-          onClose={() => setShowModal(false)}
-          onCreated={handleCreated}
-        />
-      )}
-    </div>
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 8, marginTop: 32 }}>
+                <button className="tbc-page-btn" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>← Prev</button>
+                <span style={{ height: 36, padding: "0 16px", display: "inline-flex", alignItems: "center", fontFamily: "inherit", fontSize: 11, fontWeight: 600, color: "var(--text1)", border: "1.5px solid var(--border)", opacity: 0.5 }}>
+                  {page} / {pagination.totalPages}
+                </span>
+                <button className="tbc-page-btn" disabled={page === pagination.totalPages} onClick={() => setPage((p) => p + 1)}>Next →</button>
+              </div>
+            )}
+          </>
+        )}
+
+        {showModal && (
+          <CreateTeamModal challengeId={challengeId} onClose={() => setShowModal(false)} onCreated={handleCreated} />
+        )}
+      </div>
+    </>
   );
 }

@@ -1,26 +1,34 @@
+/**
+ * routes/authRoutes.js  — with Zod validation
+ */
 const express  = require('express');
 const router   = express.Router();
 const passport = require('../config/passportConfig');
 
 const {
   register,
+  verifyEmail,
+  resendOTP,
   login,
   logout,
   refresh,
   oauthCallback,
-  forgotPassword,  // 🔹 NEW
-  resetPassword,   // 🔹 NEW
+  forgotPassword,
+  resetPassword,
 } = require('../controllers/authController');
 
-// ── Email / password ──────────────────────────────────────────────────────────
-router.post('/register', register);
-router.post('/login',    login);
-router.post('/logout',   logout);
-router.post('/refresh',  refresh);
+const validate      = require('../validators/validate');
+const authSchemas   = require('../validators/authValidators');
 
-// 🔹 NEW — Password reset flow
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password',  resetPassword);
+// ── Email / password ──────────────────────────────────────────────────────────
+router.post('/register',        validate(authSchemas.register),        register);
+router.post('/verify-email',    validate(authSchemas.verifyEmail),     verifyEmail);
+router.post('/resend-otp',      validate(authSchemas.resendOTP),       resendOTP);
+router.post('/login',           validate(authSchemas.login),           login);
+router.post('/logout',          logout);
+router.post('/refresh',         refresh);
+router.post('/forgot-password', validate(authSchemas.forgotPassword),  forgotPassword);
+router.post('/reset-password',  validate(authSchemas.resetPassword),   resetPassword);
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
 router.get('/google',

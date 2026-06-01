@@ -1,28 +1,21 @@
-/**
- * paymentController.js
- * Handles Razorpay payment flow with email confirmation via nodemailer.
- *
- * Install: npm install razorpay
- * .env:
- *   RAZORPAY_KEY_ID=rzp_test_xxxxx
- *   RAZORPAY_KEY_SECRET=xxxxxxxx
- *   RAZORPAY_WEBHOOK_SECRET=xxxxxxxx (optional)
- */
-
-const Razorpay = require('razorpay');
-const crypto   = require('crypto');
-const User     = require('../models/User');
-const asyncHandler = require('../utils/asyncHandler');
-const ApiError     = require('../utils/ApiError');
-const ApiResponse  = require('../utils/ApiResponse');
+const Razorpay   = require('razorpay');
+const crypto     = require('crypto');
+const User       = require('../models/User');
+const asyncHandler  = require('../utils/asyncHandler');
+const ApiError      = require('../utils/ApiError');
+const ApiResponse   = require('../utils/ApiResponse');
 const { createNotification }          = require('../utils/notificationService');
-const { sendPaymentConfirmationEmail } = require('../utils/emailService'); // 🔹 NEW
+const { sendPaymentConfirmationEmail } = require('../utils/emailService');
+const getRedisClient                  = require('../config/redisClient');
+const REDIS_KEYS                      = require('../config/redisKeys');
 
 // ── Plan config ───────────────────────────────────────────────────────────────
 const PLAN_CONFIG = {
   ten_day: { name: '10-Day Sprint', amountPaise: 9900,  durationDays: 10 },
   monthly: { name: 'Monthly Pro',   amountPaise: 19900, durationDays: 30 },
 };
+
+const DEDUP_TTL_SECS = 24 * 60 * 60; // 24 hours
 
 let _razorpay = null;
 function getRazorpay() {
@@ -48,9 +41,9 @@ exports.createOrder = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'plan must be "ten_day" or "monthly"');
   }
 
-  const config    = PLAN_CONFIG[plan];
-  const razorpay  = getRazorpay();
-  const receipt   = `rcpt_${req.user._id.toString().slice(-8)}_${Date.now().toString().slice(-8)}`;
+  const config   = PLAN_CONFIG[plan];
+  const razorpay = getRazorpay();
+  const receipt  = `rcpt_${req.user._id.toString().slice(-8)}_${Date.now().toString().slice(-8)}`;
 
   const order = await razorpay.orders.create({
     amount:   config.amountPaise,
@@ -77,7 +70,7 @@ exports.createOrder = asyncHandler(async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/payment/verify
-// 🔹 UPDATED — sends payment confirmation email after successful verification
+// 🔹 REDIS — deduplicate: reject if this payment_id was already verified
 // ─────────────────────────────────────────────────────────────────────────────
 exports.verifyPayment = asyncHandler(async (req, res) => {
   const {
@@ -92,6 +85,15 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
   }
 
   if (!PLAN_CONFIG[plan]) throw new ApiError(400, 'Invalid plan');
+
+  // 🔹 Deduplication check — prevent replay attack
+  const redis      = getRedisClient();
+  const dedupKey   = REDIS_KEYS.paymentVerified(razorpay_payment_id);
+  const alreadyDone = await redis.get(dedupKey);
+
+  if (alreadyDone) {
+    throw new ApiError(409, 'This payment has already been verified.');
+  }
 
   // ── Verify HMAC-SHA256 signature ──────────────────────────────────────────
   const expectedSignature = crypto
@@ -114,6 +116,9 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
   );
   if (!user) throw new ApiError(404, 'User not found');
 
+  // 🔹 Mark payment as verified in Redis — TTL 24 hours
+  await redis.setex(dedupKey, DEDUP_TTL_SECS, '1');
+
   res.json(new ApiResponse(200, {
     user:      user.toPublicJSON(),
     plan,
@@ -121,7 +126,7 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
     expiresAt: expiry,
   }, `${config.name} plan activated successfully! 🎉`));
 
-  // 🔹 Fire-and-forget after response — notification + email
+  // Fire-and-forget after response
   createNotification(req.app, user._id, {
     type:    'submission_published',
     message: `🎉 Your ${config.name} plan is now active! Expires ${expiry.toDateString()}.`,
@@ -138,6 +143,7 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/payment/webhook
+// 🔹 REDIS — deduplicate: skip if this payment_id was already processed
 // ─────────────────────────────────────────────────────────────────────────────
 exports.webhook = async (req, res) => {
   try {
@@ -158,16 +164,31 @@ exports.webhook = async (req, res) => {
     const event = req.body;
 
     if (event.event === 'payment.captured') {
-      const payment = event.payload?.payment?.entity;
-      const notes   = payment?.notes || {};
-      const userId  = notes.userId;
-      const plan    = notes.plan;
+      const payment  = event.payload?.payment?.entity;
+      const notes    = payment?.notes || {};
+      const userId   = notes.userId;
+      const plan     = notes.plan;
+      const paymentId = payment?.id;
 
-      if (userId && plan && PLAN_CONFIG[plan]) {
+      if (userId && plan && PLAN_CONFIG[plan] && paymentId) {
+        // 🔹 Deduplication — skip if already processed
+        const redis    = getRedisClient();
+        const dedupKey = REDIS_KEYS.webhookProcessed(paymentId);
+        const already  = await redis.get(dedupKey);
+
+        if (already) {
+          console.log(`[Webhook] Duplicate event for payment ${paymentId} — skipping`);
+          return res.json({ received: true });
+        }
+
         const config = PLAN_CONFIG[plan];
         const expiry = new Date(Date.now() + config.durationDays * 24 * 60 * 60 * 1000);
 
         await User.findByIdAndUpdate(userId, { plan, planExpiresAt: expiry });
+
+        // 🔹 Mark as processed — TTL 24 hours
+        await redis.setex(dedupKey, DEDUP_TTL_SECS, '1');
+
         console.log(`[Webhook] Plan ${plan} activated for user ${userId}`);
       }
     }

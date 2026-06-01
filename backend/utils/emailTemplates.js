@@ -1,9 +1,6 @@
 /**
  * utils/emailTemplates.js
- *
- * HTML email templates for InceptaX.
- * All templates use inline styles (required for email clients).
- * Design is minimal, dark-friendly, and mobile-responsive.
+ * HTML email templates for InceptaX (inline styles for email client compatibility).
  */
 
 const CLIENT_URL = () => process.env.CLIENT_URL || 'http://localhost:5173';
@@ -14,8 +11,8 @@ function wrap(content) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>InceptaX</title>
 </head>
 <body style="margin:0;padding:0;background:#0a0a0a;font-family:'Inter',Arial,sans-serif;color:#ffffff;">
@@ -23,14 +20,13 @@ function wrap(content) {
     <tr>
       <td align="center" style="padding:40px 16px;">
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-
-          <!-- Logo / header -->
+          <!-- Logo -->
           <tr>
             <td align="center" style="padding-bottom:28px;">
               <table cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="background:#ffffff;border-radius:10px;width:36px;height:36px;text-align:center;vertical-align:middle;display:inline-block;">
-                    <span style="color:#0a0a0a;font-size:12px;font-weight:700;letter-spacing:0.3px;line-height:36px;display:block;">IX</span>
+                  <td style="background:#ffffff;border-radius:10px;width:36px;height:36px;text-align:center;vertical-align:middle;">
+                    <span style="color:#0a0a0a;font-size:12px;font-weight:700;line-height:36px;display:block;">IX</span>
                   </td>
                   <td style="padding-left:10px;vertical-align:middle;">
                     <span style="color:#ffffff;font-size:16px;font-weight:600;letter-spacing:-0.3px;">InceptaX</span>
@@ -39,14 +35,12 @@ function wrap(content) {
               </table>
             </td>
           </tr>
-
           <!-- Card -->
           <tr>
             <td style="background:rgba(255,255,255,0.04);border:0.5px solid rgba(255,255,255,0.1);border-radius:14px;padding:32px 28px;">
               ${content}
             </td>
           </tr>
-
           <!-- Footer -->
           <tr>
             <td align="center" style="padding-top:24px;">
@@ -56,7 +50,6 @@ function wrap(content) {
               </p>
             </td>
           </tr>
-
         </table>
       </td>
     </tr>
@@ -65,22 +58,19 @@ function wrap(content) {
 </html>`;
 }
 
-// ── Shared button ─────────────────────────────────────────────────────────────
 function btn(label, url) {
   return `
   <table cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
     <tr>
-      <td style="background:#ffffff;border-radius:9px;padding:0;">
-        <a href="${url}" style="display:inline-block;padding:12px 24px;font-size:13px;font-weight:600;color:#0a0a0a;text-decoration:none;letter-spacing:-0.2px;">${label}</a>
+      <td style="background:#ffffff;border-radius:9px;">
+        <a href="${url}" style="display:inline-block;padding:12px 24px;font-size:13px;font-weight:600;color:#0a0a0a;text-decoration:none;">${label}</a>
       </td>
     </tr>
   </table>`;
 }
 
-// ── Divider ───────────────────────────────────────────────────────────────────
-const divider = `<hr style="border:none;border-top:0.5px solid rgba(255,255,255,0.1);margin:20px 0;" />`;
+const divider = `<hr style="border:none;border-top:0.5px solid rgba(255,255,255,0.1);margin:20px 0;"/>`;
 
-// ── Heading ───────────────────────────────────────────────────────────────────
 function h1(text) {
   return `<h1 style="font-size:20px;font-weight:600;color:#ffffff;margin:0 0 8px;letter-spacing:-0.4px;">${text}</h1>`;
 }
@@ -102,7 +92,54 @@ function statRow(label, value, highlight = false) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WELCOME EMAIL
+// 🔹 NEW — OTP VERIFICATION EMAIL
+// ─────────────────────────────────────────────────────────────────────────────
+function getOTPTemplate(user, otp) {
+  return wrap(`
+    ${h1('Verify your email address 🔐')}
+    ${p(`Hi ${user.name?.split(' ')[0]}, use the code below to verify your InceptaX account.`)}
+    ${divider}
+
+    <!-- OTP display block -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+      <tr>
+        <td align="center">
+          <div style="display:inline-block;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:12px;padding:20px 40px;">
+            <p style="font-size:11px;color:rgba(255,255,255,0.4);letter-spacing:2px;text-transform:uppercase;margin:0 0 10px;font-family:monospace;">
+              Verification Code
+            </p>
+            <!-- Each digit in its own box -->
+            <div style="display:flex;gap:8px;justify-content:center;">
+              ${otp.split('').map((digit) => `
+                <span style="
+                  display:inline-block;
+                  width:36px;height:44px;
+                  background:rgba(255,255,255,0.08);
+                  border:1px solid rgba(255,255,255,0.2);
+                  border-radius:8px;
+                  font-size:24px;font-weight:700;
+                  color:#ffffff;
+                  text-align:center;line-height:44px;
+                  font-family:monospace;
+                ">${digit}</span>
+              `).join('')}
+            </div>
+            <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:12px 0 0;font-family:monospace;">
+              Expires in 10 minutes
+            </p>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    ${divider}
+    ${p('Enter this code on the verification screen to activate your account.', true)}
+    ${p('If you didn\'t create an InceptaX account, you can safely ignore this email.', true)}
+  `);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WELCOME
 // ─────────────────────────────────────────────────────────────────────────────
 function getWelcomeTemplate(user) {
   return wrap(`
@@ -130,8 +167,6 @@ function getWelcomeTemplate(user) {
 // ─────────────────────────────────────────────────────────────────────────────
 function getSubmissionPublishedTemplate(user, submission) {
   const challengeTitle = submission.assignmentId?.title || 'your challenge';
-  const challengeId    = submission.assignmentId?._id   || '';
-
   return wrap(`
     ${h1('Your submission is live! 🎉')}
     ${p(`Great work, ${user.name?.split(' ')[0]}. Your project for <strong style="color:#fff;">${challengeTitle}</strong> has been reviewed and published.`)}
@@ -154,7 +189,6 @@ function getSubmissionPublishedTemplate(user, submission) {
 // ─────────────────────────────────────────────────────────────────────────────
 function getSubmissionRejectedTemplate(user, submission) {
   const challengeTitle = submission.assignmentId?.title || 'your challenge';
-
   return wrap(`
     ${h1('Submission update')}
     ${p(`Hi ${user.name?.split(' ')[0]}, your submission for <strong style="color:#fff;">${challengeTitle}</strong> was not accepted this round.`)}
@@ -177,7 +211,6 @@ function getPaymentConfirmationTemplate(user, { planName, expiresAt, paymentId }
   const expiry = expiresAt
     ? new Date(expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : '—';
-
   return wrap(`
     ${h1(`${planName} activated! ✅`)}
     ${p(`Thanks for upgrading, ${user.name?.split(' ')[0]}! Your plan is now active and all premium features are unlocked.`)}
@@ -209,9 +242,9 @@ function getDeadlineReminderTemplate(recipient, assignment) {
     ${p(`Hi ${recipient.name?.split(' ')[0]}, the challenge <strong style="color:#fff;">${assignment.title}</strong> is closing soon!`)}
     ${divider}
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      ${statRow('Challenge',   assignment.title)}
-      ${statRow('Time left',   `~${assignment.hoursLeft} hours`, true)}
-      ${statRow('Deadline',    new Date(assignment.deadline).toLocaleString('en-IN'))}
+      ${statRow('Challenge', assignment.title)}
+      ${statRow('Time left', `~${assignment.hoursLeft} hours`, true)}
+      ${statRow('Deadline',  new Date(assignment.deadline).toLocaleString('en-IN'))}
     </table>
     ${divider}
     ${p('Submit your project before the deadline to be ranked on the leaderboard.', true)}
@@ -245,7 +278,7 @@ function getPasswordResetTemplate(user, resetUrl) {
     ${p('Click the button below to set a new password. This link expires in <strong style="color:#fff;">1 hour</strong>.')}
     ${btn('Reset Password →', resetUrl)}
     ${divider}
-    ${p('If you didn\'t request a password reset, you can safely ignore this email. Your password will not be changed.', true)}
+    ${p('If you didn\'t request a password reset, you can safely ignore this email.', true)}
     <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:12px 0 0;word-break:break-all;">
       Or copy this link: <a href="${resetUrl}" style="color:rgba(255,255,255,0.4);">${resetUrl}</a>
     </p>
@@ -253,6 +286,7 @@ function getPasswordResetTemplate(user, resetUrl) {
 }
 
 module.exports = {
+  getOTPTemplate,                    // 🔹 NEW
   getWelcomeTemplate,
   getSubmissionPublishedTemplate,
   getSubmissionRejectedTemplate,

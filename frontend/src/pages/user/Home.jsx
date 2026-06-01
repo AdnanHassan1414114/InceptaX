@@ -121,8 +121,8 @@ export default function Home() {
               <div
                 key={plan.id}
                 style={{
-                  background: isFeatured ? "var(--btn-primary-bg)" : "var(--bg2)",
-                  border: `0.5px solid ${isFeatured ? "var(--btn-primary-bg)" : "var(--border)"}`,
+                  background: "var(--bg2)",
+                  border: `0.5px solid ${"var(--border)"}`,
                   borderRadius: 14,
                   padding: "26px 20px",
                   display: "flex",
@@ -151,18 +151,18 @@ export default function Home() {
                   </div>
                 )}
                 <div style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 500, color: isFeatured ? "var(--logo-fg)" : "var(--text1)", margin: "0 0 10px" }}>{plan.name}</h3>
+                  <h3 style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)", margin: "0 0 10px" }}>{plan.name}</h3>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                    <span style={{ fontSize: 30, fontWeight: 500, color: isFeatured ? "var(--logo-fg)" : "var(--text1)", letterSpacing: "-1px" }}>
+                    <span style={{ fontSize: 30, fontWeight: 500, color: "var(--text1)", letterSpacing: "-1px" }}>
                       {plan.price === 0 ? "₹0" : `₹${plan.price}`}
                     </span>
-                    {plan.period && <span style={{ fontSize: 12, color: isFeatured ? "rgba(0,0,0,0.4)" : "var(--text2)" }}>/ {plan.period}</span>}
+                    {plan.period && <span style={{ fontSize: 12, color: "var(--text2)" }}>/ {plan.period}</span>}
                   </div>
                 </div>
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 22px", flex: 1 }}>
                   {plan.features.map((f) => (
-                    <li key={f} style={{ display: "flex", gap: 8, fontSize: 12, color: isFeatured ? "rgba(0,0,0,0.55)" : "var(--text2)", marginBottom: 9, lineHeight: 1.5 }}>
-                      <span style={{ color: isFeatured ? "rgba(0,0,0,0.5)" : "var(--text3)", flexShrink: 0 }}>✓</span>
+                    <li key={f} style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--text2)", marginBottom: 9, lineHeight: 1.5 }}>
+                      <span style={{ color: "var(--text3)", flexShrink: 0 }}>✓</span>
                       {f}
                     </li>
                   ))}
@@ -177,9 +177,9 @@ export default function Home() {
                     fontSize: 13,
                     fontWeight: 500,
                     textDecoration: "none",
-                    background: isFeatured ? "var(--logo-fg)" : "var(--bg3)",
-                    color: isFeatured ? "var(--logo-bg)" : "var(--text2)",
-                    border: isFeatured ? "none" : "0.5px solid var(--border2)",
+                    background: "var(--bg3)",
+                    color: "var(--text2)",
+                    border: "0.5px solid var(--border2)",
                   }}
                 >
                   {plan.cta}

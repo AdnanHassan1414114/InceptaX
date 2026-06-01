@@ -1,5 +1,9 @@
+/**
+ * routes/assignmentRoutes.js  — with Zod validation
+ */
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
+
 const {
   getAssignments,
   getAssignment,
@@ -7,16 +11,36 @@ const {
   updateAssignment,
   deleteAssignment,
 } = require('../controllers/assignmentController');
-const authMiddleware = require('../middleware/authMiddleware');
-const adminMiddleware = require('../middleware/adminMiddleware');
 
-// Public + optional auth (for plan-based access info)
-router.get('/', authMiddleware, getAssignments);
+const authMiddleware       = require('../middleware/authMiddleware');
+const adminMiddleware      = require('../middleware/adminMiddleware');
+const validate             = require('../validators/validate');
+const assignmentSchemas    = require('../validators/assignmentValidators');
+
+// Public + optional auth
+router.get(
+  '/',
+  authMiddleware,
+  validate(assignmentSchemas.listAssignments, 'query'),
+  getAssignments
+);
 router.get('/:id', authMiddleware, getAssignment);
 
 // Admin only
-router.post('/', authMiddleware, adminMiddleware, createAssignment);
-router.put('/:id', authMiddleware, adminMiddleware, updateAssignment);
+router.post(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  validate(assignmentSchemas.createAssignment),
+  createAssignment
+);
+router.put(
+  '/:id',
+  authMiddleware,
+  adminMiddleware,
+  validate(assignmentSchemas.updateAssignment),
+  updateAssignment
+);
 router.delete('/:id', authMiddleware, adminMiddleware, deleteAssignment);
 
 module.exports = router;

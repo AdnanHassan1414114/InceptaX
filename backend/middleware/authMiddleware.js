@@ -1,7 +1,17 @@
+/**
+ * middleware/authMiddleware.js
+ *
+ * 🔹 REDIS — checks access token blacklist on every authenticated request.
+ * Refresh token validation moved to Redis (handled in authController refresh()).
+ * User.refreshToken field on MongoDB is no longer checked here.
+ */
+
 const { verifyAccessToken } = require('../utils/tokenUtils');
-const ApiError = require('../utils/ApiError');
-const asyncHandler = require('../utils/asyncHandler');
-const User = require('../models/User');
+const ApiError              = require('../utils/ApiError');
+const asyncHandler          = require('../utils/asyncHandler');
+const User                  = require('../models/User');
+const getRedisClient        = require('../config/redisClient');
+const REDIS_KEYS            = require('../config/redisKeys');
 
 const authMiddleware = asyncHandler(async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -19,17 +29,21 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     throw new ApiError(401, 'Invalid or expired access token');
   }
 
-  const user = await User.findById(decoded.id).select('+refreshToken');
+  // 🔹 Check blacklist — token was invalidated on logout
+  const redis       = getRedisClient();
+  const blacklisted = await redis.get(REDIS_KEYS.tokenBlacklist(token));
+  if (blacklisted) {
+    throw new ApiError(401, 'Token has been invalidated. Please log in again.');
+  }
+
+  const user = await User.findById(decoded.id);
   if (!user) {
     throw new ApiError(401, 'User no longer exists');
   }
 
-  // 🔹 FIXED — getActivePlan() returns { name, isActive, expiresAt? }, NOT a string.
-  // The original compared the whole object to user.plan (a string), which was
-  // always unequal (object !== string), triggering a DB save on every request.
-  // Now we correctly extract `.name` before comparing.
+  // Auto-expire plan if needed
   const activePlan     = user.getActivePlan();
-  const activePlanName = activePlan.name; // 🔹 string: "free" | "ten_day" | "monthly"
+  const activePlanName = activePlan.name;
 
   if (activePlanName !== user.plan) {
     user.plan = activePlanName;

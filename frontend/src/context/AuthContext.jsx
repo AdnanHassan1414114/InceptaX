@@ -7,84 +7,82 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ── Initialize auth from localStorage ─────────────────────────────────────
+  // ── Initialize from localStorage ──────────────────────────────────────────
   useEffect(() => {
-    const initAuth = () => {
-      try {
-        const storedUser = localStorage.getItem("user");
-        const token      = localStorage.getItem("accessToken");
-
-        if (storedUser && token) {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
-          api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-        }
-      } catch (err) {
-        console.error("Auth init error:", err);
-        localStorage.clear();
-      } finally {
-        setLoading(false);
+    try {
+      const storedUser = localStorage.getItem("user");
+      const token      = localStorage.getItem("accessToken");
+      if (storedUser && token) {
+        setUser(JSON.parse(storedUser));
+        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       }
-    };
-    initAuth();
+    } catch (err) {
+      console.error("Auth init error:", err);
+      localStorage.clear();
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // ── REGISTER ───────────────────────────────────────────────────────────────
+  // ── REGISTER — returns { userId } for OTP step, does NOT log user in yet ──
   const registerWithEmail = async (email, password, name, username) => {
     try {
-      const res = await api.post(
-        "/auth/register",
-        { name, email, username, password },
-        { withCredentials: true }
-      );
-      const { user: u, accessToken } = res.data.data;
-      _storeSession(u, accessToken);
-      return u;
+      const res = await api.post("/auth/register", { name, email, username, password });
+      // Returns { userId } — no accessToken until email is verified
+      return res.data.data; // { userId }
     } catch (error) {
-      console.error("Register error:", error.response?.data || error.message);
       throw error.response?.data || error;
     }
   };
 
-  // ── LOGIN (email / password) ───────────────────────────────────────────────
+  // 🔹 NEW — VERIFY EMAIL (OTP step)
+  // Sends OTP to backend → on success stores session and logs user in
+  const verifyEmail = async (userId, otp) => {
+    try {
+      const res = await api.post("/auth/verify-email", { userId, otp }, { withCredentials: true });
+      const { user: u, accessToken } = res.data.data;
+      _storeSession(u, accessToken);
+      return u;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  };
+
+  // 🔹 NEW — RESEND OTP
+  const resendOTP = async (userId) => {
+    try {
+      await api.post("/auth/resend-otp", { userId });
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  };
+
+  // ── LOGIN ──────────────────────────────────────────────────────────────────
   const loginWithEmail = async (email, password) => {
     try {
-      const res = await api.post(
-        "/auth/login",
-        { email, password },
-        { withCredentials: true }
-      );
+      const res = await api.post("/auth/login", { email, password }, { withCredentials: true });
       const { user: u, accessToken } = res.data.data;
       _storeSession(u, accessToken);
       return u;
     } catch (error) {
-      console.error("Login error:", error.response?.data || error.message);
+      // Re-throw so Login.jsx can handle EMAIL_NOT_VERIFIED sentinel
       throw error.response?.data || error;
     }
   };
 
-  // 🔹 NEW — LOGIN (OAuth callback)
-  // Called by OAuthCallback page after backend redirects with ?token=xxx
-  // Stores the token, fetches the full user object from /users/me,
-  // then sets user in context + localStorage.
+  // ── OAUTH ──────────────────────────────────────────────────────────────────
   const loginWithOAuth = async (accessToken) => {
     try {
-      // Attach token so the /users/me request is authenticated
       api.defaults.headers.common["Authorization"] = `Bearer ${accessToken}`;
       localStorage.setItem("accessToken", accessToken);
-
-      // Fetch full user profile (includes plan, skills, socialLinks etc.)
       const res = await api.get("/users/me", { withCredentials: true });
       const u   = res.data.data.user;
-
       localStorage.setItem("user", JSON.stringify(u));
       setUser(u);
       return u;
     } catch (error) {
-      // Clean up on failure
       delete api.defaults.headers.common["Authorization"];
       localStorage.removeItem("accessToken");
-      console.error("OAuth login error:", error.response?.data || error.message);
       throw error.response?.data || error;
     }
   };
@@ -108,12 +106,11 @@ export const AuthProvider = ({ children }) => {
       setUser(updatedUser);
       return updatedUser;
     } catch (error) {
-      console.error("Update profile error:", error.response?.data);
       throw error.response?.data || error;
     }
   };
 
-  // ── REFRESH USER (after plan change, payment, etc.) ────────────────────────
+  // ── REFRESH USER ───────────────────────────────────────────────────────────
   const refreshUser = async () => {
     try {
       const res = await api.get("/users/me", { withCredentials: true });
@@ -125,7 +122,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── Private helpers ────────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
   const _storeSession = (u, accessToken) => {
     localStorage.setItem("user",        JSON.stringify(u));
     localStorage.setItem("accessToken", accessToken);
@@ -141,18 +138,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        registerWithEmail,
-        loginWithEmail,
-        loginWithOAuth,   // 🔹 NEW
-        logout,
-        updateUserProfile,
-        refreshUser,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user, loading,
+      registerWithEmail,
+      verifyEmail,        // 🔹
+      resendOTP,          // 🔹
+      loginWithEmail,
+      loginWithOAuth,
+      logout,
+      updateUserProfile,
+      refreshUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );

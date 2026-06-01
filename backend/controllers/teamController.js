@@ -1,11 +1,12 @@
-const Team = require('../models/Team');
-const Assignment = require('../models/Assignment');
+const Team        = require('../models/Team');
+const Assignment  = require('../models/Assignment');
 const TeamMessage = require('../models/TeamMessage');
 const asyncHandler = require('../utils/asyncHandler');
-const ApiError = require('../utils/ApiError');
+const ApiError    = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { getPaginationOptions, buildPaginatedResponse } = require('../utils/pagination');
 const { createNotification, createBulkNotifications } = require('../utils/notificationService');
+const { publishTeamMessage } = require('../utils/chatPubSub'); // 🔹 NEW
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function assertMember(team, userId) {
@@ -24,7 +25,7 @@ exports.createTeam = asyncHandler(async (req, res) => {
   }
 
   const activePlan = req.user.getActivePlan();
-  const planName = activePlan?.name ?? activePlan;
+  const planName   = activePlan?.name ?? activePlan;
   if (planName === 'free') {
     throw new ApiError(403, 'Creating teams requires a premium plan (10-Day Sprint or Monthly Pro)');
   }
@@ -41,11 +42,11 @@ exports.createTeam = asyncHandler(async (req, res) => {
   const resolvedMax = maxMembers ? Math.min(10, Math.max(2, parseInt(maxMembers, 10))) : 3;
 
   const team = await Team.create({
-    teamName: teamName.trim(),
+    teamName:      teamName.trim(),
     challengeId,
-    createdBy: req.user._id,
-    members: [req.user._id],
-    maxMembers: resolvedMax,
+    createdBy:     req.user._id,
+    members:       [req.user._id],
+    maxMembers:    resolvedMax,
     requiredRoles: Array.isArray(requiredRoles)
       ? requiredRoles.map((r) => r.trim()).filter(Boolean)
       : [],
@@ -53,8 +54,8 @@ exports.createTeam = asyncHandler(async (req, res) => {
   });
 
   await team.populate([
-    { path: 'createdBy', select: 'name username profileImage' },
-    { path: 'members', select: 'name username profileImage' },
+    { path: 'createdBy',   select: 'name username profileImage' },
+    { path: 'members',     select: 'name username profileImage' },
     { path: 'challengeId', select: 'title difficulty deadline' },
   ]);
 
@@ -62,14 +63,12 @@ exports.createTeam = asyncHandler(async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/teams/my  🔹 NEW
-// Returns all teams the current user is a member of.
-// Used by ChatContext to populate the conversation list.
+// GET /api/teams/my
 // ─────────────────────────────────────────────────────────────────────────────
 exports.getMyTeams = asyncHandler(async (req, res) => {
   const teams = await Team.find({ members: req.user._id })
     .populate('createdBy', 'name username profileImage')
-    .populate('members', 'name username profileImage')
+    .populate('members',   'name username profileImage')
     .populate('challengeId', 'title _id')
     .sort({ updatedAt: -1 });
 
@@ -84,7 +83,7 @@ exports.getTeamById = asyncHandler(async (req, res) => {
 
   const team = await Team.findById(teamId)
     .populate('createdBy', 'name username profileImage')
-    .populate('members', 'name username profileImage')
+    .populate('members',   'name username profileImage')
     .populate('challengeId', 'title difficulty deadline isPremium')
     .populate('joinRequests.userId', 'name username profileImage plan');
 
@@ -94,9 +93,8 @@ exports.getTeamById = asyncHandler(async (req, res) => {
   const isCreator = team.createdBy._id.toString() === userId;
   const isMember  = team.members.some((m) => m._id.toString() === userId);
 
-  const teamObj = team.toObject();
+  const teamObj        = team.toObject();
   if (!isCreator) delete teamObj.joinRequests;
-
   teamObj.openSpots    = team.maxMembers - team.members.length;
   teamObj.isCreator    = isCreator;
   teamObj.isMember     = isMember;
@@ -117,8 +115,8 @@ exports.getTeamsByChallenge = asyncHandler(async (req, res) => {
   if (!challenge) throw new ApiError(404, 'Challenge not found');
 
   const { skip, limit, page, pageSize } = getPaginationOptions(req.query);
-
   const filter = { challengeId };
+
   if (req.query.status) {
     const validStatuses = ['Planning', 'Building', 'Completed'];
     if (!validStatuses.includes(req.query.status)) {
@@ -132,7 +130,7 @@ exports.getTeamsByChallenge = asyncHandler(async (req, res) => {
   const [teams, total] = await Promise.all([
     Team.find(filter)
       .populate('createdBy', 'name username profileImage')
-      .populate('members', 'name username profileImage')
+      .populate('members',   'name username profileImage')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -140,26 +138,23 @@ exports.getTeamsByChallenge = asyncHandler(async (req, res) => {
   ]);
 
   const enriched = teams.map((t) => {
-    const obj = t.toObject();
-    obj.openSpots    = t.maxMembers - t.members.length;
-    obj.isMember     = t.members.some((m) => m._id.toString() === userId);
-    obj.isCreator    = t.createdBy._id.toString() === userId;
-    obj.hasRequested = t.joinRequests.some((r) => r.userId?.toString() === userId);
+    const obj         = t.toObject();
+    obj.openSpots     = t.maxMembers - t.members.length;
+    obj.isMember      = t.members.some((m) => m._id.toString() === userId);
+    obj.isCreator     = t.createdBy._id.toString() === userId;
+    obj.hasRequested  = t.joinRequests.some((r) => r.userId?.toString() === userId);
     delete obj.joinRequests;
     return obj;
   });
 
-  res.json(
-    new ApiResponse(200, {
-      challenge: { _id: challenge._id, title: challenge.title },
-      ...buildPaginatedResponse(enriched, total, page, pageSize),
-    })
-  );
+  res.json(new ApiResponse(200, {
+    challenge: { _id: challenge._id, title: challenge.title },
+    ...buildPaginatedResponse(enriched, total, page, pageSize),
+  }));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/teams/:teamId/request
-// 🔹 Notification: notify team creator
 // ─────────────────────────────────────────────────────────────────────────────
 exports.requestToJoin = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
@@ -178,8 +173,8 @@ exports.requestToJoin = asyncHandler(async (req, res) => {
 
   const alreadyElsewhere = await Team.findOne({
     challengeId: team.challengeId,
-    members: userId,
-    _id: { $ne: teamId },
+    members:     userId,
+    _id:         { $ne: teamId },
   });
   if (alreadyElsewhere) throw new ApiError(409, 'You are already a member of another team for this challenge');
 
@@ -206,24 +201,19 @@ exports.requestToJoin = asyncHandler(async (req, res) => {
 exports.getJoinRequests = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
 
-  const team = await Team.findById(teamId).populate(
-    'joinRequests.userId',
-    'name username profileImage plan'
-  );
+  const team = await Team.findById(teamId).populate('joinRequests.userId', 'name username profileImage plan');
   if (!team) throw new ApiError(404, 'Team not found');
 
   if (team.createdBy.toString() !== req.user._id.toString()) {
     throw new ApiError(403, 'Only the team leader can view join requests');
   }
 
-  res.json(
-    new ApiResponse(200, {
-      teamId:        team._id,
-      teamName:      team.teamName,
-      totalRequests: team.joinRequests.length,
-      joinRequests:  team.joinRequests,
-    })
-  );
+  res.json(new ApiResponse(200, {
+    teamId:        team._id,
+    teamName:      team.teamName,
+    totalRequests: team.joinRequests.length,
+    joinRequests:  team.joinRequests,
+  }));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,9 +234,7 @@ exports.respondToJoinRequest = asyncHandler(async (req, res) => {
     throw new ApiError(403, 'Only the team leader can respond to join requests');
   }
 
-  const requestIndex = team.joinRequests.findIndex(
-    (r) => r.userId.toString() === requestUserId
-  );
+  const requestIndex = team.joinRequests.findIndex((r) => r.userId.toString() === requestUserId);
   if (requestIndex === -1) throw new ApiError(404, 'Join request not found for this user');
 
   if (action === 'accept') {
@@ -267,14 +255,13 @@ exports.respondToJoinRequest = asyncHandler(async (req, res) => {
 
     team.members.push(requestUserId);
     team.joinRequests.splice(requestIndex, 1);
-
     if (team.members.length >= team.maxMembers && team.status === 'Planning') {
       team.status = 'Building';
     }
 
     await team.save();
     await team.populate([
-      { path: 'members', select: 'name username profileImage' },
+      { path: 'members',   select: 'name username profileImage' },
       { path: 'createdBy', select: 'name username profileImage' },
     ]);
 
@@ -311,7 +298,7 @@ exports.respondToJoinRequest = asyncHandler(async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 exports.removeMember = asyncHandler(async (req, res) => {
   const { teamId, memberId } = req.params;
-  const requesterId = req.user._id.toString();
+  const requesterId          = req.user._id.toString();
 
   const team = await Team.findById(teamId);
   if (!team) throw new ApiError(404, 'Team not found');
@@ -326,19 +313,17 @@ exports.removeMember = asyncHandler(async (req, res) => {
   if (memberIndex === -1) throw new ApiError(404, 'This user is not a member of the team');
 
   team.members.splice(memberIndex, 1);
-
   if (team.status === 'Building' && team.members.length < team.maxMembers) {
     team.status = 'Planning';
   }
 
   await team.save();
   await team.populate([
-    { path: 'members', select: 'name username profileImage' },
+    { path: 'members',   select: 'name username profileImage' },
     { path: 'createdBy', select: 'name username profileImage' },
   ]);
 
-  const message = isSelf ? 'You have left the team' : 'Member removed from team';
-  res.json(new ApiResponse(200, { team }, message));
+  res.json(new ApiResponse(200, { team }, isSelf ? 'You have left the team' : 'Member removed from team'));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -367,9 +352,8 @@ exports.updateTeamStatus = asyncHandler(async (req, res) => {
 
   team.status = status;
   await team.save();
-
   await team.populate([
-    { path: 'members', select: 'name username profileImage' },
+    { path: 'members',   select: 'name username profileImage' },
     { path: 'createdBy', select: 'name username profileImage' },
   ]);
 
@@ -403,8 +387,11 @@ exports.getTeamMessages = asyncHandler(async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/teams/:teamId/chat
-// 🔹 UPDATED — notification removed. Chat has its own unread counter system
-//              in the frontend ChatContext via socket. No notification spam.
+//
+// 🔹 REDIS PUB/SUB — Instead of calling io.to().emit() directly, we now
+//    PUBLISH the message to a Redis channel (ix:chat:team:<teamId>).
+//    The subscriber in chatPubSub.js receives it and calls io.to().emit()
+//    on EVERY server instance — so horizontal scaling works automatically.
 // ─────────────────────────────────────────────────────────────────────────────
 exports.sendTeamMessage = asyncHandler(async (req, res) => {
   const { teamId } = req.params;
@@ -427,17 +414,12 @@ exports.sendTeamMessage = asyncHandler(async (req, res) => {
 
   await teamMessage.populate('senderId', 'name username profileImage');
 
-  const io = req.app.get('io');
-  if (io) {
-    // Emit to the team room — all connected members receive it in real-time
-    io.to(`team:${teamId}`).emit('team_message', {
-      ...teamMessage.toObject(),
-      teamId, // ensure teamId is included for ChatContext routing
-    });
-  }
-
-  // 🔹 NO notification call here — chat unread counts are managed by
-  //    ChatContext via the socket event, not the notification system.
+  // 🔹 Publish to Redis — all instances receive and re-emit via Socket.io
+  // This replaces the old: io.to(`team:${teamId}`).emit('team_message', ...)
+  await publishTeamMessage(teamId, {
+    ...teamMessage.toObject(),
+    teamId, // ensure teamId is in the payload for ChatContext routing
+  });
 
   res.status(201).json(new ApiResponse(201, { message: teamMessage }, 'Message sent'));
 });
