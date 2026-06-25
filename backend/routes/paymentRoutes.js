@@ -7,7 +7,7 @@ const router  = express.Router();
 const { createOrder, verifyPayment, webhook } = require('../controllers/paymentController');
 const authMiddleware   = require('../middleware/authMiddleware');
 const validate         = require('../validators/validate');
-const paymentSchemas   = require('../validators/paymentValidators');
+const paymentSchemas   = require('../validators/Paymentvalidators');
 
 router.post('/create-order', authMiddleware, validate(paymentSchemas.createOrder), createOrder);
 router.post('/verify',       authMiddleware, validate(paymentSchemas.verifyPayment), verifyPayment);

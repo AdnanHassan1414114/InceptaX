@@ -15,7 +15,7 @@ const {
 const authMiddleware       = require('../middleware/authMiddleware');
 const adminMiddleware      = require('../middleware/adminMiddleware');
 const validate             = require('../validators/validate');
-const assignmentSchemas    = require('../validators/assignmentValidators');
+const assignmentSchemas    = require('../validators/Assignmentvalidators');
 
 // Public + optional auth
 router.get(

@@ -12,7 +12,7 @@ const {
 } = require('../controllers/submissionController');
 const authMiddleware      = require('../middleware/authMiddleware');
 const validate            = require('../validators/validate');
-const submissionSchemas   = require('../validators/submissionValidators');
+const submissionSchemas   = require('../validators/Submissionvalidators');
 
 router.post(
   '/',

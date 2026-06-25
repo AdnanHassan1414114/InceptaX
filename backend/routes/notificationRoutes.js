@@ -28,7 +28,7 @@ const {
 const getRedisClient      = require('../config/redisClient');
 const REDIS_KEYS          = require('../config/redisKeys');
 const validate            = require('../validators/validate');                   // FIX: added
-const notificationSchemas = require('../validators/notificationValidators');     // FIX: added
+const notificationSchemas = require('../validators/Notificationvalidators');     // FIX: added
 
 router.use(authMiddleware);
 

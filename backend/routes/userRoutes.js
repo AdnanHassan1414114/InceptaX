@@ -14,7 +14,7 @@ const {
 
 const authMiddleware = require('../middleware/authMiddleware');
 const validate       = require('../validators/validate');
-const userSchemas    = require('../validators/userValidators');
+const userSchemas    = require('../validators/Uservalidators');
 
 router.get('/me', authMiddleware, getMe);
 

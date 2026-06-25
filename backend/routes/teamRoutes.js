@@ -20,7 +20,7 @@ const {
 
 const authMiddleware  = require('../middleware/authMiddleware');
 const validate        = require('../validators/validate');
-const teamSchemas     = require('../validators/teamValidators');
+const teamSchemas     = require('../validators/Teamvalidators');
 
 // POST /api/teams
 router.post(

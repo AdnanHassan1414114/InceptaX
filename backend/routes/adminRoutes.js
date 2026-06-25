@@ -23,8 +23,8 @@ const {
 const authMiddleware     = require('../middleware/authMiddleware');
 const adminMiddleware    = require('../middleware/adminMiddleware');
 const validate           = require('../validators/validate');
-const adminSchemas       = require('../validators/adminValidators');
-const assignmentSchemas  = require('../validators/assignmentValidators');
+const adminSchemas       = require('../validators/Adminvalidators');
+const assignmentSchemas  = require('../validators/Assignmentvalidators');
 
 // All admin routes require auth + admin role
 router.use(authMiddleware, adminMiddleware);
