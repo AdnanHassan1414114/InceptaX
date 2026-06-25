@@ -18,7 +18,7 @@ const {
 } = require('../controllers/authController');
 
 const validate      = require('../validators/validate');
-const authSchemas   = require('../validators/authValidators');
+const authSchemas   = require('../validators/AuthValidators');
 
 // ── Email / password ──────────────────────────────────────────────────────────
 router.post('/register',        validate(authSchemas.register),        register);
