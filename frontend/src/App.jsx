@@ -85,7 +85,7 @@ const UserApp = () => (
         <Route path="/auth/callback"  element={<OAuthCallback />} />
 
         {/* App routes */}
-        <Route path="/challenges"                  element={<Challenges />} />
+        <Route path="/challenges"                  element={<PrivateRoute><Challenges /></PrivateRoute>} />
         <Route path="/challenges/:id"              element={<ChallengeDetail />} />
         <Route path="/challenges/:id/submit"       element={<PrivateRoute><SubmitProject /></PrivateRoute>} />
         <Route path="/challenges/:id/teams"        element={<PrivateRoute><TeamsByChallenge /></PrivateRoute>} />

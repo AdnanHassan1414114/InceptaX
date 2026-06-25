@@ -5,13 +5,14 @@ const asyncHandler  = require('../utils/asyncHandler');
 const ApiError      = require('../utils/ApiError');
 const ApiResponse   = require('../utils/ApiResponse');
 const { getPaginationOptions, buildPaginatedResponse } = require('../utils/pagination');
-const { createNotification }       = require('../utils/notificationService');
-const { notifySubmissionPublished } = require('./submissionController');
+const { createNotification }          = require('../utils/notificationService');
+const { notifySubmissionPublished }   = require('./submissionController');
+const { evaluateSubmissionWithAI }    = require('../utils/aiEvaluationService');
 const {
   sendSubmissionPublishedEmail,
   sendSubmissionRejectedEmail,
   sendEmailBlast,
-} = require('../utils/emailService'); // 🔹 NEW
+} = require('../utils/emailService');
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 exports.getStats = asyncHandler(async (req, res) => {
@@ -107,7 +108,6 @@ exports.getSubmissions = asyncHandler(async (req, res) => {
 });
 
 // PATCH /api/admin/submissions/:id/review
-// 🔹 UPDATED — sends emails on publish and rejection
 exports.reviewSubmission = asyncHandler(async (req, res) => {
   const { adminScore, adminNotes, status } = req.body;
   const validStatuses = ['admin_reviewed', 'published', 'rejected'];
@@ -122,21 +122,30 @@ exports.reviewSubmission = asyncHandler(async (req, res) => {
   const submission = await Submission.findById(req.params.id);
   if (!submission) throw new ApiError(404, 'Submission not found');
 
-  const previousStatus = submission.status; // 🔹 track status change
+  const previousStatus = submission.status;
 
-  if (adminScore !== undefined) submission.adminScore = adminScore;
+  if (adminScore !== undefined) {
+    submission.adminScore = adminScore;
+    // FIX: was directly overwriting finalScore with adminScore, which threw away
+    // the AI average entirely. Restored the original blending logic — if an AI
+    // score exists, blend it (40% AI / 60% admin); otherwise fall back to admin-only.
+    if (submission.aiScore !== null && submission.aiScore !== undefined) {
+      submission.finalScore = Math.round(submission.aiScore * 0.4 + adminScore * 0.6);
+    } else {
+      submission.finalScore = adminScore;
+    }
+    submission.adminScoreOverride = true; // log that admin provided a manual score
+  }
   if (adminNotes !== undefined) submission.adminNotes = adminNotes;
   if (status)                   submission.status     = status;
 
-  if (submission.aiScore !== null && submission.adminScore !== null) {
-    submission.finalScore = Math.round(submission.aiScore * 0.4 + submission.adminScore * 0.6);
-  } else if (submission.adminScore !== null) {
-    submission.finalScore = submission.adminScore;
-  }
-
   await submission.save();
 
-  if (submission.status === 'published') {
+  // Only recalculate ranks when needed
+  const justPublished = status === 'published' && previousStatus !== 'published';
+  const scoreChanged  = adminScore !== undefined && submission.status === 'published';
+
+  if (justPublished || scoreChanged) {
     await recalculateRanks(submission.assignmentId);
   }
 
@@ -147,16 +156,14 @@ exports.reviewSubmission = asyncHandler(async (req, res) => {
 
   res.json(new ApiResponse(200, { submission }, 'Submission reviewed'));
 
-  // 🔹 Post-response fire-and-forget: notifications + emails
+  // Post-response fire-and-forget
   const submissionOwner = submission.userId;
 
   if (submission.status === 'published' && previousStatus !== 'published') {
     try {
       const fresh = await Submission.findById(submission._id)
         .populate('assignmentId', 'title _id');
-      // Notification
       notifySubmissionPublished(req.app, fresh);
-      // 🔹 Email
       sendSubmissionPublishedEmail(submissionOwner, fresh);
     } catch (err) {
       console.error('[adminController] Publish email/notification error:', err.message);
@@ -164,11 +171,11 @@ exports.reviewSubmission = asyncHandler(async (req, res) => {
   }
 
   if (submission.status === 'rejected' && previousStatus !== 'rejected') {
-    // 🔹 Email for rejection
     sendSubmissionRejectedEmail(submissionOwner, submission);
   }
 });
 
+// POST /api/admin/submissions/:id/ai-evaluate
 exports.aiEvaluate = asyncHandler(async (req, res) => {
   const submission = await Submission.findById(req.params.id).populate(
     'assignmentId', 'title description difficulty'
@@ -179,17 +186,55 @@ exports.aiEvaluate = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Only pending submissions can be AI-evaluated');
   }
 
-  const mockEvaluation = generateMockAIEvaluation(submission);
-  submission.aiScore   = mockEvaluation.score;
-  submission.aiFeedback = mockEvaluation.feedback;
-  submission.status    = 'ai_evaluated';
+  if (submission.repoStatus === 'processing') {
+    throw new ApiError(409, 'Repository is still being processed — try again in a moment');
+  }
+
+  // 🔹 NEW (step 10) — set status to 'evaluating' so the frontend can
+  // show a live "Evaluating..." state while the 5 AI calls run in parallel.
+  // Reverted to 'pending' below if all providers fail, so the admin can retry.
+  submission.status = 'evaluating';
   await submission.save();
 
-  res.json(new ApiResponse(200, { submission, evaluation: mockEvaluation }, 'AI evaluation complete'));
+  let evaluations, finalScore;
+  try {
+    ({ evaluations, finalScore } = await evaluateSubmissionWithAI(submission));
+  } catch (err) {
+    // All 5 providers failed — revert to 'pending' so the admin can retry
+    await Submission.findByIdAndUpdate(req.params.id, { status: 'pending' });
+    throw err;
+  }
+
+  // Store individual AI evaluations (premium users will see these)
+  submission.aiEvaluations = evaluations;
+
+  // Store finalScore (average of all AI scores)
+  submission.aiScore    = finalScore;
+  submission.finalScore = finalScore;
+
+  // Also populate legacy aiFeedback field for backward compatibility with existing frontend
+  // Uses the first successful evaluation's data
+  const first = evaluations[0];
+  if (first) {
+    submission.aiFeedback = {
+      strengths:   first.strengths,
+      weaknesses:  first.weaknesses,
+      suggestions: first.improvements,
+    };
+  }
+
+  submission.status = 'ai_evaluated';
+  await submission.save();
+
+  res.json(new ApiResponse(200, {
+    submission,
+    evaluations,
+    finalScore,
+    providersUsed: evaluations.map((e) => e.provider),
+  }, `AI evaluation complete — ${evaluations.length} providers evaluated`));
 });
 
 // POST /api/admin/email/blast
-// 🔹 UPDATED — sends real emails via nodemailer, replaces console.log mock
 exports.emailBlast = asyncHandler(async (req, res) => {
   const { subject, body, targetPlan } = req.body;
 
@@ -206,12 +251,10 @@ exports.emailBlast = asyncHandler(async (req, res) => {
     return res.json(new ApiResponse(200, { recipientCount: 0 }, 'No users matched the filter'));
   }
 
-  // Respond immediately — sending happens in background
   res.json(
     new ApiResponse(200, { recipientCount: users.length }, `Email blast queued for ${users.length} users`)
   );
 
-  // 🔹 Send real emails after response — fire-and-forget
   sendEmailBlast(users, { subject, body });
 });
 
@@ -231,16 +274,4 @@ async function recalculateRanks(assignmentId) {
   }));
 
   if (bulkOps.length) await Submission.bulkWrite(bulkOps);
-}
-
-function generateMockAIEvaluation() {
-  const score = Math.floor(Math.random() * 41) + 60;
-  return {
-    score,
-    feedback: {
-      strengths:   ['Clean project structure', 'Good use of version control', 'Clear documentation'],
-      weaknesses:  ['No test coverage detected', 'Error handling could be more comprehensive'],
-      suggestions: ['Add unit and integration tests', 'Consider CI/CD pipeline', 'Improve input validation'],
-    },
-  };
 }

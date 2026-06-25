@@ -38,13 +38,11 @@ const seed = async () => {
     { name: 'Dan Patel', email: 'dan@test.com', username: 'dan_hacks', plan: 'monthly', planExpiresAt: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000), githubUsername: 'danpatel' },
   ];
 
-  const users = await User.insertMany(
-    usersData.map((u) => ({ ...u, password: 'Test@12345', bio: `Developer and challenger at InceptaX` }))
+  // FIX: removed the pointless insertMany → deleteMany block that was here before.
+  // User.create() triggers the pre-save password hashing hook, so we use it directly.
+  const createdUsers = await Promise.all(
+    usersData.map((u) => User.create({ ...u, password: 'Test@12345', bio: 'Developer and challenger at InceptaX' }))
   );
-  // Re-fetch because insertMany bypasses pre-save hooks for password hashing
-  // Instead, create individually to trigger hashing:
-  await User.deleteMany({ email: { $in: usersData.map((u) => u.email) } });
-  const createdUsers = await Promise.all(usersData.map((u) => User.create({ ...u, password: 'Test@12345', bio: 'Developer and challenger at InceptaX' })));
   console.log(`✅ ${createdUsers.length} users created`);
 
   // ── Create assignments ──────────────────────────────────────────────────────
@@ -144,7 +142,9 @@ const seed = async () => {
   await Submission.insertMany(submissionsData);
   console.log(`✅ ${submissionsData.length} submissions created`);
 
- 
+  // FIX: added header label before listing users — was missing before
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🧑‍💻 Seeded users (email → plan):');
   createdUsers.forEach((u) => console.log(`  ${u.email} (plan: ${u.plan})`));
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 

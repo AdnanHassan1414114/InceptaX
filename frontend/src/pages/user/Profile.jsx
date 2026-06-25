@@ -14,259 +14,322 @@ function sanitiseUrl(raw = "") {
 
 /* ── Constants ───────────────────────────────────────────────────── */
 const STATUS_MAP = {
-  pending:        { label: "Pending"   },
-  ai_evaluated:   { label: "AI Done"   },
-  admin_reviewed: { label: "In Review" },
-  published:      { label: "Published" },
-  rejected:       { label: "Rejected"  },
+  pending:        { label: "Pending",    dot: "#fbbf24" },
+  ai_evaluated:   { label: "AI Done",    dot: "#38bdf8" },
+  admin_reviewed: { label: "In Review",  dot: "#38bdf8" },
+  published:      { label: "Published",  dot: "#2ea44f" },
+  rejected:       { label: "Rejected",   dot: "#f87171" },
 };
 
 const PLAN_LABEL = {
   free:    "Free",
   ten_day: "Sprint",
-  monthly: "Pro ✦",
+  monthly: "Pro",
 };
+
+const ACCENT = "#2ea44f"; /* GitHub-green — the one accent used across the page */
 
 /* ── Styles ──────────────────────────────────────────────────────── */
 const css = `
-  @keyframes pf-pulse {
-    0%, 100% { opacity: 0.06; }
-    50%       { opacity: 0.14; }
-  }
-
   .pf-root {
-    --bg: #ffffff;
-    --fg: #000000;
-    --border: #000000;
-    --text1: #000000;
-    font-family: 'Inter', system-ui, sans-serif;
+    --bg: #050505;
+    --card: #0e0e10;
+    --card-hover: #16171a;
+    --border: #232428;
+    --fg: #e6edf3;
+    --text1: #e6edf3;
+    --muted: #8b949e;
+    --mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   }
-  .dark .pf-root,
-  [data-theme="dark"] .pf-root {
-    --bg: #000000;
-    --fg: #ffffff;
-    --border: #ffffff;
-    --text1: #ffffff;
+  .light .pf-root,
+  [data-theme="light"] .pf-root {
+    --bg: #ffffff;
+    --card: #ffffff;
+    --card-hover: #f6f8fa;
+    --border: #d0d7de;
+    --fg: #1f2328;
+    --text1: #1f2328;
+    --muted: #59636e;
   }
   .pf-root * { box-sizing: border-box; }
 
+  .pf-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 700px) {
+    .pf-grid { grid-template-columns: 1fr; }
+  }
+
   /* Card */
   .pf-card {
-    background: var(--bg);
-    border: 1.5px solid var(--border);
-    margin-bottom: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
   }
 
-  /* Badge */
-  .pf-badge {
+  /* Sidebar */
+  .pf-avatar {
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    object-fit: cover;
+    display: block;
+  }
+  .pf-avatar-fallback {
+    width: 132px;
+    height: 132px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--card-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .pf-empty-chip {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: var(--card-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 18px;
+  }
+  .pf-empty-icon {
+    width: 22px;
+    height: 22px;
+    color: var(--muted);
+  }
+  .pf-name { font-size: 20px; font-weight: 700; color: var(--text1); margin: 14px 0 0; letter-spacing: -0.01em; }
+  .pf-username { font-family: var(--mono); font-size: 15px; font-weight: 400; color: var(--muted); margin: 2px 0 0; }
+  .pf-bio { font-size: 13px; color: var(--text1); line-height: 1.5; margin: 14px 0 0; }
+
+  .pf-sidebar-btn {
+    width: 100%;
+    height: 30px;
+    margin-top: 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text1);
+    background: var(--card-hover);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .pf-sidebar-btn:hover { background: var(--border); }
+
+  .pf-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 9px;
+  }
+  .pf-meta-row a { color: var(--muted); text-decoration: none; }
+  .pf-meta-row a:hover { color: var(--text1); text-decoration: underline; }
+  .pf-meta-icon { width: 15px; height: 15px; flex-shrink: 0; opacity: 0.85; }
+
+  .pf-sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  .pf-skill-pill {
     display: inline-flex;
     align-items: center;
-    height: 20px;
-    padding: 0 8px;
-    font-family: inherit;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    border: 1.5px solid var(--border);
+    height: 22px;
+    padding: 0 9px;
+    margin: 0 6px 6px 0;
+    font-size: 11px;
+    font-weight: 600;
     color: var(--text1);
-    background: var(--bg);
-    border-radius: 0;
-    white-space: nowrap;
-    flex-shrink: 0;
+    background: var(--card-hover);
+    border: 1px solid var(--border);
+    border-radius: 999px;
   }
 
-  /* Skill tag (view mode) */
-  .pf-skill {
+  .pf-plan-pill {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    height: 20px;
-    padding: 0 8px;
-    font-family: inherit;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text1);
-    border: 1.5px solid var(--border);
-    background: var(--bg);
-    border-radius: 0;
-    opacity: 0.7;
-  }
-
-  /* Buttons */
-  .pf-btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 34px;
-    padding: 0 16px;
-    font-family: inherit;
-    font-size: 12px;
+    height: 24px;
+    padding: 0 10px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    text-decoration: none;
-    background: var(--fg);
-    color: var(--bg);
-    border: 1.5px solid var(--border);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: opacity 0.12s;
+    letter-spacing: 0.03em;
+    color: ${ACCENT};
+    background: rgba(46,160,67,0.15);
+    border: 1px solid rgba(46,160,67,0.4);
+    border-radius: 999px;
   }
-  .pf-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .pf-btn-ghost {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 34px;
-    padding: 0 16px;
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    text-decoration: none;
-    background: var(--bg);
-    color: var(--fg);
-    border: 1.5px solid var(--border);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.12s, color 0.12s;
-  }
-  .pf-btn-ghost:hover { background: var(--fg); color: var(--bg); }
-
-  /* Form inputs */
+  /* Form inputs (edit mode) */
   .pf-input {
     width: 100%;
-    height: 38px;
-    padding: 0 12px;
-    font-family: inherit;
+    height: 32px;
+    padding: 0 10px;
     font-size: 13px;
+    font-family: inherit;
     background: var(--bg);
     color: var(--fg);
-    border: 1.5px solid var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     outline: none;
   }
-  .pf-input:focus { outline: 2px solid var(--fg); outline-offset: 1px; }
+  .pf-input:focus { border-color: ${ACCENT}; box-shadow: 0 0 0 3px rgba(46,160,67,0.2); }
   .pf-textarea {
     width: 100%;
-    padding: 10px 12px;
-    font-family: inherit;
+    padding: 8px 10px;
     font-size: 13px;
+    font-family: inherit;
     background: var(--bg);
     color: var(--fg);
-    border: 1.5px solid var(--border);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     outline: none;
     resize: none;
   }
-  .pf-textarea:focus { outline: 2px solid var(--fg); outline-offset: 1px; }
+  .pf-textarea:focus { border-color: ${ACCENT}; box-shadow: 0 0 0 3px rgba(46,160,67,0.2); }
   .pf-label {
     display: block;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .pf-btn-primary {
+    height: 30px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    background: ${ACCENT};
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .pf-btn-primary:hover { filter: brightness(1.08); }
+  .pf-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pf-btn-ghost {
+    height: 30px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text1);
-    opacity: 0.45;
-    margin-bottom: 6px;
+    background: var(--card-hover);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .pf-btn-ghost:hover { background: var(--border); }
+  .pf-btn-lg {
+    height: 36px;
+    padding: 0 18px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
   }
 
-  /* Row (submissions / teams) */
+  /* Stats grid — individual boxed cards w/ colored icon chips */
+  .pf-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 700px) {
+    .pf-stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  .pf-stat-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pf-stat-chip {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+  .pf-stat-chip svg { width: 16px; height: 16px; }
+  .pf-stat-val { font-family: var(--mono); font-size: 24px; font-weight: 700; color: var(--text1); line-height: 1; }
+  .pf-stat-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+
+  /* Section heading */
+  .pf-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text1);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .pf-section-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: var(--card-hover);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 1px 8px;
+  }
+
+  /* Repo-style rows */
   .pf-row {
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 14px 20px;
+    padding: 14px 16px;
     text-decoration: none;
-    border-top: 1.5px solid var(--border);
-    transition: background 0.12s;
+    border-top: 1px solid var(--border);
+    transition: background 0.1s;
   }
   .pf-row:first-child { border-top: none; }
-  .pf-row:hover { background: var(--fg); }
-  .pf-row:hover .pf-row-title,
-  .pf-row:hover .pf-row-sub,
-  .pf-row:hover .pf-row-score,
-  .pf-row:hover .pf-row-rank,
-  .pf-row:hover .pf-badge { color: var(--bg); border-color: rgba(255,255,255,0.25); }
-  .pf-row:hover .pf-row-arrow { color: var(--bg); }
+  .pf-row:hover { background: var(--card-hover); }
+  .pf-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pf-row-title { font-size: 13px; font-weight: 600; color: ${ACCENT}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pf-row-meta { font-size: 11px; color: var(--muted); margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .pf-row-tag { font-family: var(--mono); }
+  .pf-row-score { font-family: var(--mono); font-size: 16px; font-weight: 700; color: var(--text1); text-align: right; }
+  .pf-row-rank { font-size: 10px; color: var(--muted); text-align: right; margin-top: 2px; }
 
-  .pf-row-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text1);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .pf-row-sub {
-    font-size: 11px;
-    color: var(--text1);
-    opacity: 0.4;
-    margin: 3px 0 0;
-  }
-  .pf-row-score {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--text1);
-    letter-spacing: -0.03em;
-    text-align: right;
-  }
-  .pf-row-rank {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text1);
-    opacity: 0.4;
-    text-align: right;
-  }
-  .pf-row-arrow {
-    font-size: 11px;
-    color: var(--text1);
-    opacity: 0.35;
-    flex-shrink: 0;
-  }
-
-  /* Stat cell */
-  .pf-stat {
-    text-align: center;
-    padding: 16px 8px;
-    border-right: 1.5px solid var(--border);
-  }
-  .pf-stat:last-child { border-right: none; }
-
-  /* Divider */
-  .pf-divider {
-    border: none;
-    border-top: 1.5px solid var(--border);
-    opacity: 0.12;
-    margin: 0;
-  }
-
-  /* Skeleton */
   .pf-skeleton {
-    background: var(--fg);
-    border: 1.5px solid var(--border);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
     animation: pf-pulse 1.4s ease-in-out infinite;
-    margin-bottom: 12px;
   }
-
-  /* Social links */
-  .pf-social-link {
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    color: var(--text1);
-    text-decoration: none;
-    opacity: 0.5;
-    border-bottom: 1px solid transparent;
-    transition: opacity 0.12s, border-color 0.12s;
-  }
-  .pf-social-link:hover { opacity: 1; border-bottom-color: var(--fg); }
+  @keyframes pf-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.9; } }
 `;
+
+const Icon = ({ d, className = "pf-meta-icon" }) => (
+  <svg className={className} viewBox="0 0 16 16" fill="currentColor"><path d={d} /></svg>
+);
+const ICONS = {
+  github:   "M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z",
+  link:     "M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.001 1.001 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287Zm6.563 3.336L12.657 8.5a3 3 0 1 0-4.243-4.243L6.586 6.086A3 3 0 0 0 7.414 11l.586-.586a1 1 0 0 0 .154-.199 2 2 0 0 1-.861-3.337l1.827-1.828a2 2 0 1 1 2.83 2.83l-.793.792c.08.42.12.85.12 1.287Z",
+  calendar: "M4.75 0a.75.75 0 0 1 .75.75V2h5V.75a.75.75 0 0 1 1.5 0V2h1.5A1.75 1.75 0 0 1 15.25 3.75v9.5A1.75 1.75 0 0 1 13.5 15h-11A1.75 1.75 0 0 1 .75 13.25v-9.5A1.75 1.75 0 0 1 2.5 2H4V.75A.75.75 0 0 1 4.75 0ZM2.5 3.5a.25.25 0 0 0-.25.25V6h11.5V3.75a.25.25 0 0 0-.25-.25h-11ZM13.75 7.5H2.25v5.75c0 .138.112.25.25.25h11a.25.25 0 0 0 .25-.25V7.5Z",
+  trophy:   "M2.5 2h11a.5.5 0 0 1 .5.5v1.25c0 1.93-1.21 3.59-2.92 4.24A4.502 4.502 0 0 1 8.5 11.93V13h2a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1h2v-1.07a4.502 4.502 0 0 1-2.58-3.94C2.71 7.34 1.5 5.68 1.5 3.75V2.5a.5.5 0 0 1 .5-.5Zm.5 1.75c0 1.24.74 2.32 1.81 2.8A4.49 4.49 0 0 1 4.5 5V3H3v.75ZM12 3v2c0 .58.13 1.14.37 1.64a3.01 3.01 0 0 0 1.63-2.64V3h-2Z",
+  bolt:     "M11.251.068a.5.5 0 0 1 .227.58L9.677 6.5H13a.5.5 0 0 1 .364.843l-8 8.5a.5.5 0 0 1-.842-.49L6.323 9.5H3a.5.5 0 0 1-.364-.843l8-8.5a.5.5 0 0 1 .615-.09Z",
+  flame:    "M8.5.5a.5.5 0 0 0-.864-.345C5.563 2.295 4.5 4.55 4.5 6.5a4.5 4.5 0 0 0 .157 1.18A3.5 3.5 0 0 1 3 5c0-.483.176-1.054.485-1.658a.5.5 0 0 0-.74-.642C1.45 3.967.5 5.86.5 7.5a5.5 5.5 0 1 0 11 0c0-2.6-1.34-4.917-3-7Z",
+  check:    "M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z",
+  box:      "M7.752.066a.5.5 0 0 1 .496 0l6.25 3.5a.5.5 0 0 1 .252.434v7a.5.5 0 0 1-.252.434l-6.25 3.5a.5.5 0 0 1-.496 0l-6.25-3.5A.5.5 0 0 1 1 11V4a.5.5 0 0 1 .252-.434ZM2 4.957v5.59l5.25 2.94V7.898Zm6.25 8.531 5.25-2.94v-5.59L8.25 7.898ZM7.75 1.07 2.929 3.785 7.75 6.5l4.821-2.715Z",
+};
 
 /* ── Component ───────────────────────────────────────────────────── */
 export default function Profile() {
@@ -286,6 +349,7 @@ export default function Profile() {
     socialLinks: { twitter: "", linkedin: "", website: "" },
   });
   const [skillInput, setSkillInput] = useState("");
+  const [avatarError, setAvatarError] = useState(false);
 
   const isOwn = me?.username === username;
 
@@ -367,10 +431,14 @@ export default function Profile() {
   if (loading) return (
     <>
       <style>{css}</style>
-      <div className="pf-root" style={{ maxWidth: 760, margin: "0 auto", padding: "48px 20px" }}>
-        <div className="pf-skeleton" style={{ height: 220 }} />
-        <div className="pf-skeleton" style={{ height: 80 }} />
-        <div className="pf-skeleton" style={{ height: 280 }} />
+      <div className="pf-root" style={{ maxWidth: 1000, margin: "0 auto", padding: "40px 20px" }}>
+        <div className="pf-grid">
+          <div className="pf-skeleton" style={{ height: 360 }} />
+          <div>
+            <div className="pf-skeleton" style={{ height: 90, marginBottom: 20 }} />
+            <div className="pf-skeleton" style={{ height: 280 }} />
+          </div>
+        </div>
       </div>
     </>
   );
@@ -378,10 +446,10 @@ export default function Profile() {
   if (error) return (
     <>
       <style>{css}</style>
-      <div className="pf-root" style={{ maxWidth: 760, margin: "0 auto", padding: "48px 20px", textAlign: "center" }}>
+      <div className="pf-root" style={{ maxWidth: 600, margin: "0 auto", padding: "60px 20px", textAlign: "center" }}>
         <div className="pf-card" style={{ padding: 48 }}>
-          <p style={{ color: "var(--text1)", opacity: 0.6, marginBottom: 20 }}>{error}</p>
-          <Link to="/" className="pf-btn-ghost">← Home</Link>
+          <p style={{ color: "var(--muted)", marginBottom: 20, fontSize: 13 }}>{error}</p>
+          <Link to="/" className="pf-btn-ghost pf-btn-lg">← Home</Link>
         </div>
       </div>
     </>
@@ -389,217 +457,224 @@ export default function Profile() {
 
   if (!profile) return null;
 
-  const avatar    = profile.profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${profile.name}&backgroundColor=111111&textColor=ffffff`;
+  const initials = (profile.name || "?")
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join("");
   const published = submissions.filter((s) => s.status === "published");
   const planLabel = PLAN_LABEL[profile.plan] || "Free";
 
   const statCells = [
-    { label: "Global Rank", value: stats?.globalRank ? `#${stats.globalRank}` : "—" },
-    { label: "Total Score", value: stats?.totalScore  ?? "—" },
-    { label: "Best Score",  value: stats?.bestScore   || "—" },
-    { label: "Published",   value: published.length },
+    { label: "Global Rank", value: stats?.globalRank ? `#${stats.globalRank}` : "—", icon: ICONS.trophy, bg: "rgba(245,158,11,0.15)", fg: "#f59e0b" },
+    { label: "Total Score", value: stats?.totalScore  ?? "—", icon: ICONS.bolt,   bg: "rgba(167,139,250,0.15)", fg: "#a78bfa" },
+    { label: "Best Score",  value: stats?.bestScore   || "—", icon: ICONS.flame,  bg: "rgba(251,146,60,0.15)",  fg: "#fb923c" },
+    { label: "Published",   value: published.length,         icon: ICONS.check,  bg: "rgba(46,160,67,0.15)",   fg: ACCENT },
   ];
 
   return (
     <>
       <style>{css}</style>
-      <div className="pf-root" style={{ maxWidth: 760, margin: "0 auto", padding: "48px 20px" }}>
+      <div className="pf-root" style={{ maxWidth: 1000, margin: "0 auto", padding: "40px 20px" }}>
+        <div className="pf-grid">
 
-        {/* ── Header card ── */}
-        <div className="pf-card" style={{ padding: "24px" }}>
-          <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+          {/* ══════════ Sidebar ══════════ */}
+          <div>
+            {profile.profileImage && !avatarError ? (
+              <img src={profile.profileImage} onError={() => setAvatarError(true)} className="pf-avatar" alt={profile.name} />
+            ) : (
+              <div className="pf-avatar-fallback" style={{ fontSize: 42 }}>{initials}</div>
+            )}
 
-            {/* Avatar */}
-            <img
-              src={avatar}
-              style={{ width: 64, height: 64, borderRadius: 0, border: "1.5px solid var(--border)", flexShrink: 0 }}
-              alt={profile.name}
-            />
+            {editing ? (
+              <input className="pf-input" style={{ marginTop: 14, fontWeight: 700 }} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+            ) : (
+              <h1 className="pf-name">{profile.name}</h1>
+            )}
+            <p className="pf-username">@{profile.username}</p>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {/* Name row */}
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
-                <div>
-                  {editing ? (
-                    <input className="pf-input" style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-                  ) : (
-                    <h1 style={{ fontSize: 20, fontWeight: 700, color: "var(--text1)", margin: "0 0 3px", letterSpacing: "-0.03em" }}>{profile.name}</h1>
-                  )}
-                  <p style={{ fontSize: 12, color: "var(--text1)", opacity: 0.4, margin: 0 }}>@{profile.username}</p>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <span className="pf-badge">{planLabel}</span>
-                  {isOwn && (
-                    editing ? (
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={handleSave} disabled={saving} className="pf-btn-primary">{saving ? "Saving…" : "Save"}</button>
-                        <button onClick={() => setEditing(false)} className="pf-btn-ghost">Cancel</button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setEditing(true)} className="pf-btn-ghost">Edit Profile</button>
-                    )
-                  )}
-                </div>
+            {isOwn && !editing && (
+              <button onClick={() => setEditing(true)} className="pf-sidebar-btn">Edit profile</button>
+            )}
+            {isOwn && editing && (
+              <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
+                <button onClick={handleSave} disabled={saving} className="pf-btn-primary" style={{ flex: 1 }}>{saving ? "Saving…" : "Save"}</button>
+                <button onClick={() => setEditing(false)} className="pf-btn-ghost" style={{ flex: 1 }}>Cancel</button>
               </div>
+            )}
 
-              {/* Edit mode */}
-              {editing ? (
-                <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div>
-                    <label className="pf-label">Bio</label>
-                    <textarea className="pf-textarea" rows={2} maxLength={300} value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })} placeholder="Tell us about yourself…" />
-                    <p style={{ fontSize: 10, color: "var(--text1)", opacity: 0.35, marginTop: 3, textAlign: "right" }}>{editForm.bio.length}/300</p>
-                  </div>
-                  <div>
-                    <label className="pf-label">GitHub Username</label>
-                    <input className="pf-input" value={editForm.githubUsername} onChange={(e) => setEditForm({ ...editForm, githubUsername: e.target.value })} placeholder="yourusername" />
-                  </div>
-                  {[
-                    { key: "twitter",  label: "Twitter / X",        placeholder: "https://twitter.com/yourhandle"      },
-                    { key: "linkedin", label: "LinkedIn",            placeholder: "https://linkedin.com/in/yourprofile" },
-                    { key: "website",  label: "Website / Portfolio", placeholder: "https://yourwebsite.com"            },
-                  ].map(({ key, label, placeholder }) => (
-                    <div key={key}>
-                      <label className="pf-label">{label}</label>
-                      <input className="pf-input" value={editForm.socialLinks[key]} onChange={(e) => setEditForm({ ...editForm, socialLinks: { ...editForm.socialLinks, [key]: e.target.value } })} placeholder={placeholder} />
-                    </div>
-                  ))}
-                  <div>
-                    <label className="pf-label">Skills (max 15)</label>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <input className="pf-input" placeholder="e.g. React, Node.js…" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSkill(); } }} />
-                      <button type="button" onClick={handleAddSkill} className="pf-btn-ghost" style={{ flexShrink: 0 }}>Add</button>
-                    </div>
-                    {(profile.skills || []).length > 0 && (
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                        {profile.skills.map((skill) => (
-                          <span key={skill} className="pf-skill">
-                            {skill}
-                            <button onClick={() => handleRemoveSkill(skill)} style={{ background: "none", border: "none", color: "var(--text1)", cursor: "pointer", padding: 0, fontSize: 14, lineHeight: 1, opacity: 0.5 }}>×</button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+            {editing ? (
+              <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <label className="pf-label">Bio</label>
+                  <textarea className="pf-textarea" rows={3} maxLength={300} value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })} placeholder="Tell us about yourself…" />
                 </div>
-
-              ) : (
-                /* View mode */
-                <div style={{ marginTop: 10 }}>
-                  {profile.bio && (
-                    <p style={{ fontSize: 13, color: "var(--text1)", opacity: 0.65, margin: "0 0 10px", lineHeight: 1.65 }}>{profile.bio}</p>
-                  )}
-                  <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: (profile.skills || []).length > 0 ? 10 : 0 }}>
-                    {profile.githubUsername && (
-                      <a href={`https://github.com/${profile.githubUsername}`} target="_blank" rel="noreferrer" className="pf-social-link">GitHub: @{profile.githubUsername}</a>
-                    )}
-                    {profile.socialLinks?.twitter && (
-                      <a href={sanitiseUrl(profile.socialLinks.twitter)} target="_blank" rel="noreferrer" className="pf-social-link">Twitter →</a>
-                    )}
-                    {profile.socialLinks?.linkedin && (
-                      <a href={sanitiseUrl(profile.socialLinks.linkedin)} target="_blank" rel="noreferrer" className="pf-social-link">LinkedIn →</a>
-                    )}
-                    {profile.socialLinks?.website && (
-                      <a href={sanitiseUrl(profile.socialLinks.website)} target="_blank" rel="noreferrer" className="pf-social-link">Website →</a>
-                    )}
-                    <span style={{ fontSize: 12, color: "var(--text1)", opacity: 0.35 }}>
-                      Joined {format(new Date(profile.createdAt), "MMM yyyy")}
-                    </span>
+                <div>
+                  <label className="pf-label">GitHub username</label>
+                  <input className="pf-input" value={editForm.githubUsername} onChange={(e) => setEditForm({ ...editForm, githubUsername: e.target.value })} placeholder="yourusername" />
+                </div>
+                {[
+                  { key: "twitter",  label: "Twitter / X",        placeholder: "https://twitter.com/yourhandle"      },
+                  { key: "linkedin", label: "LinkedIn",            placeholder: "https://linkedin.com/in/yourprofile" },
+                  { key: "website",  label: "Website",             placeholder: "https://yourwebsite.com"            },
+                ].map(({ key, label, placeholder }) => (
+                  <div key={key}>
+                    <label className="pf-label">{label}</label>
+                    <input className="pf-input" value={editForm.socialLinks[key]} onChange={(e) => setEditForm({ ...editForm, socialLinks: { ...editForm.socialLinks, [key]: e.target.value } })} placeholder={placeholder} />
+                  </div>
+                ))}
+                <div>
+                  <label className="pf-label">Skills (max 15)</label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input className="pf-input" placeholder="e.g. React" value={skillInput} onChange={(e) => setSkillInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddSkill(); } }} />
+                    <button type="button" onClick={handleAddSkill} className="pf-btn-ghost" style={{ flexShrink: 0 }}>Add</button>
                   </div>
                   {(profile.skills || []).length > 0 && (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <div style={{ marginTop: 8 }}>
                       {profile.skills.map((skill) => (
-                        <span key={skill} className="pf-skill">{skill}</span>
+                        <span key={skill} className="pf-skill-pill">
+                          {skill}
+                          <button onClick={() => handleRemoveSkill(skill)} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0, marginLeft: 5, fontSize: 13, lineHeight: 1 }}>×</button>
+                        </span>
                       ))}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <hr className="pf-divider" style={{ marginTop: 20 }} />
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCells.length}, 1fr)` }}>
-            {statCells.map((s) => (
-              <div key={s.label} className="pf-stat">
-                <div style={{ fontSize: 22, fontWeight: 700, color: "var(--text1)", letterSpacing: "-0.04em", lineHeight: 1, marginBottom: 4 }}>{s.value}</div>
-                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text1)", opacity: 0.4 }}>{s.label}</div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Teams ── */}
-        {teams.length > 0 && (
-          <>
-            <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)", margin: "0 0 12px", letterSpacing: "-0.02em" }}>Teams</h2>
-            <div className="pf-card" style={{ overflow: "hidden" }}>
-              {teams.map((t) => (
-                <Link key={t._id} to={`/team/${t._id}`} className="pf-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                      <span className="pf-row-title">{t.teamName}</span>
-                      <span className="pf-badge">{t.status}</span>
-                    </div>
-                    <p className="pf-row-sub">{t.challengeId?.title || "Challenge"} · {t.members?.length}/{t.maxMembers} members</p>
-                  </div>
-                  <span className="pf-row-arrow">View →</span>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* ── Submissions ── */}
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--text1)", margin: "0 0 12px", letterSpacing: "-0.02em" }}>
-          {isOwn ? "My Projects" : `${profile.name}'s Projects`}
-        </h2>
-
-        {submissions.length === 0 ? (
-          <div className="pf-card" style={{ padding: "56px 24px", textAlign: "center" }}>
-            {isOwn ? (
-              <>
-                <p style={{ fontSize: 13, color: "var(--text1)", opacity: 0.45, marginBottom: 20 }}>No submissions yet</p>
-                <Link to="/challenges" className="pf-btn-primary">Browse Challenges →</Link>
-              </>
             ) : (
-              <p style={{ fontSize: 13, color: "var(--text1)", opacity: 0.45, margin: 0 }}>No published projects yet</p>
+              <>
+                {profile.bio && <p className="pf-bio">{profile.bio}</p>}
+
+                <div style={{ marginTop: 14 }}>
+                  <span className="pf-plan-pill">
+                    <Icon d={ICONS.box} /> {planLabel} plan
+                  </span>
+                </div>
+
+                {profile.githubUsername && (
+                  <div className="pf-meta-row">
+                    <Icon d={ICONS.github} />
+                    <a href={`https://github.com/${profile.githubUsername}`} target="_blank" rel="noreferrer">{profile.githubUsername}</a>
+                  </div>
+                )}
+                {profile.socialLinks?.twitter && (
+                  <div className="pf-meta-row"><Icon d={ICONS.link} /><a href={sanitiseUrl(profile.socialLinks.twitter)} target="_blank" rel="noreferrer">Twitter</a></div>
+                )}
+                {profile.socialLinks?.linkedin && (
+                  <div className="pf-meta-row"><Icon d={ICONS.link} /><a href={sanitiseUrl(profile.socialLinks.linkedin)} target="_blank" rel="noreferrer">LinkedIn</a></div>
+                )}
+                {profile.socialLinks?.website && (
+                  <div className="pf-meta-row"><Icon d={ICONS.link} /><a href={sanitiseUrl(profile.socialLinks.website)} target="_blank" rel="noreferrer">Website</a></div>
+                )}
+                <div className="pf-meta-row">
+                  <Icon d={ICONS.calendar} /> Joined {format(new Date(profile.createdAt), "MMM yyyy")}
+                </div>
+
+                {(profile.skills || []).length > 0 && (
+                  <>
+                    <hr className="pf-sidebar-divider" />
+                    <div>
+                      {profile.skills.map((skill) => (
+                        <span key={skill} className="pf-skill-pill">{skill}</span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </div>
-        ) : (
-          <div className="pf-card" style={{ overflow: "hidden" }}>
-            {submissions.map((s) => {
-              const sm = STATUS_MAP[s.status] || STATUS_MAP.pending;
-              return (
-                <Link key={s._id} to={`/submissions/${s._id}`} className="pf-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                      <span className="pf-row-title">{s.assignmentId?.title}</span>
-                      <span className="pf-badge">{sm.label}</span>
-                      <span className="pf-badge">{s.assignmentId?.difficulty}</span>
-                    </div>
-                    {s.assignmentId?.tags?.length > 0 && (
-                      <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {s.assignmentId.tags.slice(0, 2).map((tag) => (
-                          <span key={tag} style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text1)", opacity: 0.4 }}>{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {s.status === "published" && s.finalScore !== null && (
-                    <div style={{ flexShrink: 0, textAlign: "right" }}>
-                      <div className="pf-row-score">{s.finalScore}</div>
-                      {s.rank && <div className="pf-row-rank">Rank #{s.rank}</div>}
-                    </div>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        )}
 
+          {/* ══════════ Main ══════════ */}
+          <div>
+            {/* Stats grid */}
+            <div className="pf-stats-grid" style={{ marginBottom: 24 }}>
+              {statCells.map((s) => (
+                <div
+                  key={s.label}
+                  className="pf-stat-card"
+                  style={{ background: `radial-gradient(160px 100px at 18% 0%, ${s.bg}, transparent 70%), var(--card)` }}
+                >
+                  <div className="pf-stat-chip" style={{ background: s.bg, color: s.fg }}>
+                    <Icon d={s.icon} className="" />
+                  </div>
+                  <div className="pf-stat-val">{s.value}</div>
+                  <div className="pf-stat-label">{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Teams */}
+            {teams.length > 0 && (
+              <>
+                <h2 className="pf-section-title">Teams <span className="pf-section-count">{teams.length}</span></h2>
+                <div className="pf-card" style={{ overflow: "hidden", marginBottom: 24 }}>
+                  {teams.map((t) => (
+                    <Link key={t._id} to={`/team/${t._id}`} className="pf-row">
+                      <span className="pf-status-dot" style={{ background: ACCENT }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="pf-row-title">{t.teamName}</div>
+                        <div className="pf-row-meta">
+                          <span>{t.challengeId?.title || "Challenge"}</span>
+                          <span className="pf-row-tag">{t.members?.length}/{t.maxMembers} members</span>
+                          <span className="pf-row-tag">{t.status}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Submissions */}
+            <h2 className="pf-section-title">
+              {isOwn ? "My Projects" : `${profile.name}'s Projects`} <span className="pf-section-count">{submissions.length}</span>
+            </h2>
+
+            {submissions.length === 0 ? (
+              <div className="pf-card" style={{ padding: "56px 24px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+                <div className="pf-empty-chip">
+                  <Icon d={ICONS.box} className="pf-empty-icon" />
+                </div>
+                {isOwn ? (
+                  <>
+                    <p style={{ fontSize: 13, color: "var(--muted)", margin: "12px 0 20px" }}>No submissions yet</p>
+                    <Link to="/challenges" className="pf-btn-primary pf-btn-lg">Browse Challenges →</Link>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 13, color: "var(--muted)", margin: "12px 0 0" }}>No published projects yet</p>
+                )}
+              </div>
+            ) : (
+              <div className="pf-card" style={{ overflow: "hidden" }}>
+                {submissions.map((s) => {
+                  const sm = STATUS_MAP[s.status] || STATUS_MAP.pending;
+                  return (
+                    <Link key={s._id} to={`/submissions/${s._id}`} className="pf-row">
+                      <span className="pf-status-dot" style={{ background: sm.dot }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="pf-row-title">{s.assignmentId?.title}</div>
+                        <div className="pf-row-meta">
+                          <span>{sm.label}</span>
+                          <span className="pf-row-tag">{s.assignmentId?.difficulty}</span>
+                          {s.assignmentId?.tags?.slice(0, 2).map((tag) => (
+                            <span key={tag} className="pf-row-tag">{tag}</span>
+                          ))}
+                        </div>
+                      </div>
+                      {s.status === "published" && s.finalScore !== null && (
+                        <div style={{ flexShrink: 0 }}>
+                          <div className="pf-row-score">{s.finalScore}</div>
+                          {s.rank && <div className="pf-row-rank">Rank #{s.rank}</div>}
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </>
   );

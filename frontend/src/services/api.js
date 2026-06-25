@@ -39,12 +39,17 @@ api.interceptors.response.use(
 
         return api(original);
       } catch (refreshError) {
-        // ❌ STOP LOOP HERE
-        localStorage.clear();
+        // FIX: only force logout if the refresh endpoint itself returned a real
+        // 401 (refresh token actually invalid/expired). Any other failure type
+        // (network hiccup, 429 rate limit, 5xx server error) should NOT wipe
+        // the session — those are transient and the user is still logged in.
+        const refreshStatus = refreshError.response?.status;
 
-        delete api.defaults.headers.common["Authorization"];
-
-        window.location.href = "/login";
+        if (refreshStatus === 401) {
+          localStorage.clear();
+          delete api.defaults.headers.common["Authorization"];
+          window.location.href = "/login";
+        }
 
         return Promise.reject(refreshError);
       }

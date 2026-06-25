@@ -84,10 +84,11 @@ exports.sendMessage = asyncHandler(async (req, res) => {
   }
 
   // 🔹 Notify submission owner when admin replies — fire-and-forget
-  // (We skip notifying admin when owner replies — admin handles many submissions)
+  // FIX: was 'new_team_message' which is wrong for submission chat.
+  // Now uses 'new_chat_message' — added to Notification.NOTIFICATION_TYPES enum.
   if (isAdmin) {
     createNotification(req.app, submission.userId, {
-      type:    'new_team_message', // closest available type; add 'new_chat_message' later if needed
+      type:    'new_chat_message',
       message: `Admin replied on your submission for "${submission.assignmentId?.title || 'a challenge'}"`,
       link:    `/submissions/${submissionId}`,
       metadata: { submissionId },

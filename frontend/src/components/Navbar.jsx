@@ -6,7 +6,7 @@ import { useNotifications } from "../context/NotificationContext";
 import { useChat } from "../context/ChatContext";
 import toast from "react-hot-toast";
 import { formatDistanceToNow } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { Trash2, UserPlus, CheckCircle2, MessageCircle, Rocket, Clock, PartyPopper, Trophy, Users, BellOff, Hand, Bell, User, LogOut } from "lucide-react";
 
 // ─── Logo ─────────────────────────────────────────────────────────────────────
 const IXLogo = () => (
@@ -19,23 +19,268 @@ const IXLogo = () => (
   </Link>
 );
 
-// ─── Nav link ─────────────────────────────────────────────────────────────────
+// ─── User avatar — renders user's image if present, else initials locally ────
+// FIX: previously fell back to an external dicebear.com image URL which can
+// fail to load (network block, slow CDN, ad-blocker) and show a broken-image
+// icon. Now falls back to initials rendered directly in CSS — zero network
+// dependency, always renders, matches the monochrome theme.
+const UserAvatar = ({ user, size = 28 }) => {
+  const initials = (user?.name || "U")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
+
+  if (user?.profileImage) {
+    return (
+      <img
+        src={user.profileImage}
+        alt=""
+        style={{ width: size, height: size, borderRadius: "50%", border: "0.5px solid var(--border)", objectFit: "cover" }}
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+    );
+  }
+
+  return (
+    <div
+      style={{
+        width: size, height: size, borderRadius: "50%",
+        border: "0.5px solid var(--border)",
+        background: "var(--bg3)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: size * 0.38, fontWeight: 500, color: "var(--text2)",
+        flexShrink: 0, userSelect: "none",
+      }}
+    >
+      {initials}
+    </div>
+  );
+};
+
+// ─── Profile menu (avatar dropdown — name, premium badge, sign out) ──────────
+const ProfileMenu = ({ user, isPremium, onLogout }) => {
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [open]);
+
+  const goToProfile = () => { setOpen(false); navigate(`/u/${user.username}`); };
+  const handleSignOut = () => { setOpen(false); onLogout(); };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Profile menu"
+        style={{
+          width: 32, height: 32, borderRadius: "50%", padding: 0, border: "none",
+          background: "transparent", cursor: "pointer", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <UserAvatar user={user} size={28} />
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute", top: "calc(100% + 8px)", right: 0, width: 200,
+            background: "var(--bg)", border: "0.5px solid var(--border2)", borderRadius: 12,
+            boxShadow: "0 16px 48px rgba(0,0,0,0.22)", zIndex: 200, overflow: "hidden",
+            animation: "nDrop 0.15s cubic-bezier(0.16,1,0.3,1)",
+          }}
+        >
+          {/* Identity block */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px" }}>
+            <UserAvatar user={user} size={36} />
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--text1)", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</p>
+              {isPremium && <span className="premium-badge">✦ Premium</span>}
+            </div>
+          </div>
+
+          <div style={{ height: 0.5, background: "var(--border)" }} />
+
+          {/* Actions */}
+          <div style={{ padding: 6 }}>
+            <button
+              onClick={goToProfile}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "9px 10px", borderRadius: 8, border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, cursor: "pointer", textAlign: "left" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text1)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text2)"; }}
+            >
+              <User size={15} strokeWidth={1.8} />
+              My profile
+            </button>
+            <button
+              onClick={handleSignOut}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 9, padding: "9px 10px", borderRadius: 8, border: "none", background: "transparent", color: "var(--text2)", fontSize: 13, cursor: "pointer", textAlign: "left" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.color = "var(--text1)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text2)"; }}
+            >
+              <LogOut size={15} strokeWidth={1.8} />
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const NavLink = ({ to, children }) => {
   const { pathname } = useLocation();
   const active = pathname === to || (to !== "/" && pathname.startsWith(to));
   return (
-    <Link to={to} style={{ fontSize: "13px", color: active ? "var(--text1)" : "var(--text2)", textDecoration: "none", transition: "color 0.2s" }}>
+    <Link
+      to={to}
+      style={{
+        position: "relative",
+        fontSize: "13px",
+        color: active ? "var(--text1)" : "var(--text2)",
+        textDecoration: "none",
+        paddingBottom: 4,
+        transition: "color 0.2s",
+      }}
+    >
       {children}
+      <span
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: -1,
+          height: 1.5,
+          borderRadius: 2,
+          background: "var(--text1)",
+          transform: active ? "scaleX(1)" : "scaleX(0)",
+          transformOrigin: "center",
+          transition: "transform 0.2s ease",
+        }}
+      />
     </Link>
   );
 };
 
-// ─── Theme toggle ─────────────────────────────────────────────────────────────
-const ThemeToggle = () => {
-  const { theme, toggleTheme } = useTheme();
+// ─── Shared: circular-reveal transition handler ──────────────────────────────
+// Used by both toggle variants below so the animation behaves identically.
+// Guards against the browser throwing when a transition is already in-flight
+// (e.g. rapid double-clicks), which previously left a stale ::view-transition-old
+// snapshot stuck on screen — that frozen snapshot is what caused text to still
+// look white right after switching to light theme.
+let _activeTransition = null;
+
+function useCircularThemeTransition(btnRef) {
+  const { toggleTheme } = useTheme();
+
+  return () => {
+    const el = btnRef.current;
+
+    // Fallback for browsers without View Transitions API support (Safari/Firefox)
+    if (!el || !document.startViewTransition) {
+      toggleTheme();
+      return;
+    }
+
+    // If a transition is already running, let it finish first instead of
+    // starting a new one on top of it (this was the source of the stuck
+    // old-theme snapshot bug).
+    if (_activeTransition) return;
+
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = document.startViewTransition(() => {
+      toggleTheme();
+    });
+    _activeTransition = transition;
+
+    transition.ready
+      .then(() => {
+        return document.documentElement.animate(
+          {
+            clipPath: [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${endRadius}px at ${x}px ${y}px)`,
+            ],
+          },
+          {
+            duration: 500,
+            easing: "ease-in-out",
+            pseudoElement: "::view-transition-new(root)",
+          }
+        ).finished;
+      })
+      .catch(() => {}) // transition can be skipped/aborted by the browser — ignore
+      .finally(() => {
+        _activeTransition = null;
+      });
+  };
+}
+
+// ─── Theme toggle — circular icon button (shown when logged in) ──────────────
+const ThemeToggleCircular = () => {
+  const { theme } = useTheme();
   const isDark = theme === "dark";
+  const btnRef = useRef(null);
+  const handleClick = useCircularThemeTransition(btnRef);
+
   return (
-    <button onClick={toggleTheme} className="ix-theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+    <button
+      ref={btnRef}
+      onClick={handleClick}
+      title="Toggle theme"
+      aria-label="Toggle theme"
+      style={{
+        position: "relative", width: 32, height: 32, borderRadius: "50%",
+        border: "0.5px solid var(--border)",
+        background: "var(--bg3)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: "pointer", color: "var(--text2)", flexShrink: 0,
+        transition: "background 0.12s, border-color 0.12s",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; e.currentTarget.style.borderColor = "var(--border2)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "var(--bg3)"; e.currentTarget.style.borderColor = "var(--border)"; }}
+    >
+      {isDark ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" />
+        </svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      )}
+    </button>
+  );
+};
+
+// ─── Theme toggle — original pill switch (shown when logged out) ─────────────
+const ThemeTogglePill = () => {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const btnRef = useRef(null);
+  const handleClick = useCircularThemeTransition(btnRef);
+
+  return (
+    <button ref={btnRef} onClick={handleClick} className="ix-theme-toggle" title="Toggle theme" aria-label="Toggle theme">
       <div className="ix-theme-toggle-knob">
         {isDark ? (
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--logo-fg)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -57,14 +302,14 @@ const ThemeToggle = () => {
 
 // ─── Notification helpers ─────────────────────────────────────────────────────
 const TYPE_ICON = {
-  join_request_received: "👋",
-  member_joined:         "✅",
-  new_team_message:      "💬",
-  new_challenge:         "🚀",
-  deadline_approaching:  "⏰",
-  submission_published:  "🎉",
-  rank_updated:          "🏆",
-  team_created:          "👥",
+  join_request_received: UserPlus,
+  member_joined:         CheckCircle2,
+  new_team_message:      MessageCircle,
+  new_challenge:         Rocket,
+  deadline_approaching:  Clock,
+  submission_published:  PartyPopper,
+  rank_updated:          Trophy,
+  team_created:          Users,
 };
 
 function groupNotifications(notifications) {
@@ -92,7 +337,7 @@ function groupNotifications(notifications) {
 
 const NotifRow = ({ group, onRead, onDelete, onNavigate }) => {
   const [hovered, setHovered] = useState(false);
-  const icon = TYPE_ICON[group.type] || "🔔";
+  const Icon = TYPE_ICON[group.type] || Bell;
   const timeAgo = group.createdAt ? formatDistanceToNow(new Date(group.createdAt), { addSuffix: true }) : "";
   return (
     <div
@@ -102,7 +347,9 @@ const NotifRow = ({ group, onRead, onDelete, onNavigate }) => {
       style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 10px 9px 12px", margin: "1px 5px", borderRadius: 8, background: hovered ? "var(--bg-hover)" : group.read ? "transparent" : "var(--bg3)", cursor: group.link ? "pointer" : "default", transition: "background 0.12s", position: "relative" }}
     >
       {!group.read && <span style={{ position: "absolute", left: 3, top: "50%", transform: "translateY(-50%)", width: 2.5, height: 18, borderRadius: 2, background: "var(--emerald)" }} />}
-      <span style={{ fontSize: 14, width: 20, textAlign: "center", flexShrink: 0, lineHeight: 1 }}>{icon}</span>
+      <span style={{ width: 20, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "var(--text2)" }}>
+        <Icon size={14} strokeWidth={1.8} />
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontSize: 12, color: group.read ? "var(--text2)" : "var(--text1)", fontWeight: group.read ? 400 : 500, margin: "0 0 2px", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.message}</p>
         <p style={{ fontSize: 10, color: "var(--text3)", margin: 0, fontFamily: "monospace" }}>{timeAgo}</p>
@@ -190,7 +437,7 @@ const NotificationBell = () => {
               ))
             ) : grouped.length === 0 ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "26px 16px", gap: 7 }}>
-                <span style={{ fontSize: 22, opacity: 0.4 }}>🔕</span>
+                <BellOff size={22} strokeWidth={1.5} style={{ opacity: 0.4, color: "var(--text2)" }} />
                 <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>No notifications</p>
               </div>
             ) : grouped.map((group) => (
@@ -216,13 +463,26 @@ const NotificationBell = () => {
 // MESSENGER CHAT PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 
-const Avatar = ({ name, profileImage, size = 28, radius = 8 }) => (
-  <img
-    src={profileImage || `https://api.dicebear.com/7.x/initials/svg?seed=${name || "U"}&backgroundColor=111111&textColor=ffffff`}
-    style={{ width: size, height: size, borderRadius: radius, flexShrink: 0 }}
-    alt={name || ""}
-  />
-);
+// FIX: was relying on an external dicebear.com URL as fallback, which can
+// fail to load and show a broken-image icon. Now renders initials locally.
+const Avatar = ({ name, profileImage, size = 28, radius = 8 }) => {
+  if (profileImage) {
+    return (
+      <img
+        src={profileImage}
+        style={{ width: size, height: size, borderRadius: radius, flexShrink: 0, objectFit: "cover" }}
+        alt={name || ""}
+        onError={(e) => { e.currentTarget.style.display = "none"; }}
+      />
+    );
+  }
+  const initials = (name || "U").trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
+  return (
+    <div style={{ width: size, height: size, borderRadius: radius, background: "var(--bg3)", border: "0.5px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.38, fontWeight: 500, color: "var(--text2)", flexShrink: 0, userSelect: "none" }}>
+      {initials}
+    </div>
+  );
+};
 
 // ── Single conversation row in the list ───────────────────────────────────────
 const ConvRow = ({ conv, isActive, onClick }) => {
@@ -501,7 +761,7 @@ const ChatPanel = () => {
                   </div>
                 ) : convList.length === 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "40px 20px", gap: 10 }}>
-                    <span style={{ fontSize: 28, opacity: 0.35 }}>💬</span>
+                    <MessageCircle size={28} strokeWidth={1.5} style={{ opacity: 0.35, color: "var(--text2)" }} />
                     <p style={{ fontSize: 13, color: "var(--text2)", margin: 0, textAlign: "center" }}>No team chats yet</p>
                     <p style={{ fontSize: 11, color: "var(--text3)", margin: 0, textAlign: "center" }}>Join or create a team to start chatting</p>
                     <Link to="/challenges" onClick={() => setOpen(false)} className="btn-ghost" style={{ fontSize: 11, marginTop: 6 }}>
@@ -532,7 +792,7 @@ const ChatPanel = () => {
                   </div>
                 ) : activeConv.messages.length === 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, gap: 8 }}>
-                    <span style={{ fontSize: 24, opacity: 0.35 }}>👋</span>
+                    <Hand size={24} strokeWidth={1.5} style={{ opacity: 0.35, color: "var(--text2)" }} />
                     <p style={{ fontSize: 12, color: "var(--text3)", margin: 0 }}>Say hi to your team!</p>
                   </div>
                 ) : (
@@ -616,8 +876,6 @@ export default function Navbar() {
   };
 
   const isPremium = user?.plan !== "free" && user?.planExpiresAt && new Date() < new Date(user.planExpiresAt);
-  const avatar = user?.profileImage
-    || `https://api.dicebear.com/7.x/initials/svg?seed=${user?.name || "U"}&backgroundColor=111111&textColor=ffffff`;
 
   return (
     <nav style={{
@@ -640,38 +898,30 @@ export default function Navbar() {
         </div>
 
         {/* Desktop right */}
-        <div className="hidden md:flex items-center gap-2">
-          <ThemeToggle />
+        <div className="hidden md:flex items-center" style={{ gap: 10 }}>
           {user ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {isPremium && <span className="premium-badge">✦ Premium</span>}
-              {/* 🔹 Chat icon */}
+            <>
               <ChatPanel />
-              {/* Notification bell */}
               <NotificationBell />
-              <Link to={`/u/${user.username}`} style={{ display: "flex", alignItems: "center", gap: 6, textDecoration: "none", marginLeft: 2 }}>
-                <img src={avatar} alt="" style={{ width: 28, height: 28, borderRadius: 7, border: "0.5px solid var(--border2)" }} />
-                <span style={{ fontSize: "13px", color: "var(--text2)" }}>{user.name?.split(" ")[0]}</span>
-              </Link>
-              <button onClick={handleLogout} className="btn-ghost" style={{ fontSize: "12px", padding: "6px 12px" }}>Sign out</button>
-            </div>
+              <ProfileMenu user={user} isPremium={isPremium} onLogout={handleLogout} />
+            </>
           ) : (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Link to="/login" className="btn-ghost" style={{ fontSize: "12px" }}>Sign in</Link>
-              <Link to="/login" className="btn-primary" style={{ fontSize: "12px" }}>Get started</Link>
-            </div>
+            <Link to="/login" className="btn-primary" style={{ fontSize: "12px" }}>Sign in</Link>
           )}
+
+          {/* Theme toggle — extreme right; circular when logged in, pill when logged out */}
+          {user ? <ThemeToggleCircular /> : <ThemeTogglePill />}
         </div>
 
         {/* Mobile toggle */}
         <div className="md:hidden flex items-center gap-2">
-          <ThemeToggle />
           {user && (
             <>
               <ChatPanel />
               <NotificationBell />
             </>
           )}
+          {user ? <ThemeToggleCircular /> : <ThemeTogglePill />}
           <button style={{ color: "var(--text2)", padding: 4 }} onClick={() => setMenuOpen(!menuOpen)}>
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {menuOpen
@@ -693,7 +943,7 @@ export default function Navbar() {
             {user ? (
               <div className="space-y-2">
                 <Link to={`/u/${user.username}`} onClick={() => setMenuOpen(false)} style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-                  <img src={avatar} style={{ width: 26, height: 26, borderRadius: 7 }} alt="" />
+                  <UserAvatar user={user} size={26} />
                   <span style={{ fontSize: "13px", color: "var(--text1)" }}>{user.name}</span>
                 </Link>
                 <button onClick={handleLogout} className="btn-ghost w-full" style={{ fontSize: "12px", marginTop: 8 }}>Sign out</button>

@@ -1,19 +1,19 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { Trash2 } from "lucide-react";
+import { Trash2, UserPlus, CheckCircle2, MessageCircle, Rocket, Clock, PartyPopper, Trophy, Users, BellOff, Bell } from "lucide-react";
 import { useNotifications } from "../../context/NotificationContext";
 
-// ─── Type → emoji (same as Navbar) ───────────────────────────────────────────
+// ─── Type → lucide icon (same mapping as Navbar) ─────────────────────────────
 const TYPE_ICON = {
-  join_request_received: "👋",
-  member_joined:         "✅",
-  new_team_message:      "💬",
-  new_challenge:         "🚀",
-  deadline_approaching:  "⏰",
-  submission_published:  "🎉",
-  rank_updated:          "🏆",
-  team_created:          "👥",
+  join_request_received: UserPlus,
+  member_joined:         CheckCircle2,
+  new_team_message:      MessageCircle,
+  new_challenge:         Rocket,
+  deadline_approaching:  Clock,
+  submission_published:  PartyPopper,
+  rank_updated:          Trophy,
+  team_created:          Users,
 };
 
 const TYPE_LABEL = {
@@ -126,7 +126,7 @@ export default function NotificationsPage() {
           className="ix-card"
           style={{ padding: "64px 24px", textAlign: "center" }}
         >
-          <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.4 }}>🔕</div>
+          <BellOff size={36} strokeWidth={1.5} style={{ marginBottom: 12, opacity: 0.4, color: "var(--text2)" }} />
           <p style={{ fontSize: 14, color: "var(--text2)", margin: "0 0 4px" }}>
             No notifications yet
           </p>
@@ -139,7 +139,7 @@ export default function NotificationsPage() {
         /* ── Notification list ───────────────────────────────────────────── */
         <div className="ix-card" style={{ overflow: "hidden" }}>
           {notifications.map((n, i) => {
-            const icon     = TYPE_ICON[n.type] || "🔔";
+            const Icon     = TYPE_ICON[n.type] || Bell;
             const label    = TYPE_LABEL[n.type] || "General";
             const timeAgo  = n.createdAt
               ? formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })
@@ -193,11 +193,11 @@ export default function NotificationsPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: 16,
                     flexShrink: 0,
+                    color: "var(--text2)",
                   }}
                 >
-                  {icon}
+                  <Icon size={16} strokeWidth={1.8} />
                 </div>
 
                 {/* Content */}

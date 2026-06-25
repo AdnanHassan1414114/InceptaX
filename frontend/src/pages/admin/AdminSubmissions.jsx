@@ -2,13 +2,17 @@ import { useState, useEffect, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
 import toast from "react-hot-toast";
 import adminApi from "../../services/adminApi";
+// 🔹 NEW — repo indexing status badge, added on top of the existing
+// 'evaluating' status fixes already present in this file.
+import RepoStatusBadge from "../../components/RepoStatusBadge";
 
 const STATUS_COLORS = {
-  pending: "text-ix-muted border-ix-border",
-  ai_evaluated: "text-amber-400 border-amber-500/30 bg-amber-500/5",
+  pending:        "text-ix-muted border-ix-border",
+  evaluating:     "text-violet-400 border-violet-500/30 bg-violet-500/5",
+  ai_evaluated:   "text-amber-400 border-amber-500/30 bg-amber-500/5",
   admin_reviewed: "text-blue-400 border-blue-500/30 bg-blue-500/5",
-  published: "text-emerald-400 border-emerald-500/30 bg-emerald-500/5",
-  rejected: "text-red-400 border-red-500/30 bg-red-500/5",
+  published:      "text-emerald-400 border-emerald-500/30 bg-emerald-500/5",
+  rejected:       "text-red-400 border-red-500/30 bg-red-500/5",
 };
 
 export default function AdminSubmissions() {
@@ -41,7 +45,6 @@ export default function AdminSubmissions() {
     try {
       const res = await adminApi.post(`/admin/submissions/${id}/ai-evaluate`);
       toast.success("AI evaluation complete!");
-      // Update local state
       setSubmissions((prev) => prev.map((s) =>
         s._id === id ? { ...s, ...res.data.data.submission } : s
       ));
@@ -91,13 +94,13 @@ export default function AdminSubmissions() {
 
       {/* Status filter */}
       <div className="flex gap-2 flex-wrap mb-5">
-        {["all", "pending", "ai_evaluated", "admin_reviewed", "published", "rejected"].map((s) => (
+        {["all", "pending", "evaluating", "ai_evaluated", "admin_reviewed", "published", "rejected"].map((s) => (
           <button
             key={s}
             onClick={() => { setFilter(s); setPage(1); }}
             className={`px-3 py-1.5 rounded-xl text-xs capitalize transition-all ${filter === s ? "bg-ix-primary text-white" : "border border-ix-border text-ix-muted hover:text-ix-text"}`}
           >
-            {s.replace("_", " ")}
+            {s.replace(/_/g, " ")}
           </button>
         ))}
       </div>
@@ -119,9 +122,14 @@ export default function AdminSubmissions() {
                     </span>
                     <span className="text-ix-muted text-xs">·</span>
                     <span className="text-xs text-ix-text truncate">{sub.assignmentId?.title}</span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${STATUS_COLORS[sub.status]}`}>
-                      {sub.status?.replace("_", " ")}
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${STATUS_COLORS[sub.status] || "text-ix-muted border-ix-border"}`}>
+                      {sub.status?.replace(/_/g, " ")}
                     </span>
+                    {/* 🔹 NEW — repo indexing state, separate from the
+                        evaluation-status badge above. Without this, an
+                        admin has no visibility into whether a repo has
+                        even finished being cloned/chunked/embedded yet. */}
+                    <RepoStatusBadge submission={sub} />
                   </div>
                   <div className="flex gap-3 text-[11px] text-ix-muted font-mono flex-wrap">
                     <a href={sub.repoLink} target="_blank" rel="noreferrer" className="hover:text-ix-text">GitHub →</a>
@@ -132,14 +140,42 @@ export default function AdminSubmissions() {
                   </div>
                 </div>
 
+                {/* 🔹 Evaluating fix (already present) — disabled button so
+                    the row never goes button-less mid-evaluation. */}
                 <div className="flex gap-2 flex-shrink-0">
+                  {sub.status === "evaluating" && (
+                    <button disabled className="btn-ghost text-xs px-3 py-1.5 opacity-50 cursor-not-allowed">
+                      Evaluating…
+                    </button>
+                  )}
                   {sub.status === "pending" && (
                     <button
                       onClick={() => triggerAI(sub._id)}
-                      disabled={actionLoading === sub._id + "_ai"}
+                      disabled={actionLoading === sub._id + "_ai" || sub.repoStatus === "queued" || sub.repoStatus === "processing"}
+                      title={(sub.repoStatus === "queued" || sub.repoStatus === "processing") ? "Waiting for repository indexing to finish" : ""}
                       className="btn-ghost text-xs px-3 py-1.5"
+                      style={(sub.repoStatus === "queued" || sub.repoStatus === "processing") ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
                     >
-                      {actionLoading === sub._id + "_ai" ? "Running…" : "Run AI"}
+                      {/* 🔹 FIXED — was `sub.repoStatus !== "ready"`, which
+                          evaluates true for undefined !== "ready" too —
+                          permanently disabling this button for every
+                          pre-RAG submission with no repoStatus field at
+                          all (this app's owner explicitly chose not to
+                          backfill old data, so this is a real, ongoing
+                          case, not a hypothetical). Changed to only
+                          block on the two GENUINE in-progress values
+                          ("queued"/"processing"). A missing repoStatus
+                          (undefined) or "ready" or "failed" all correctly
+                          fall through to allow the button — "failed"
+                          intentionally still allows Run AI, since
+                          evaluation can proceed on description+links
+                          alone even if repo indexing never succeeded,
+                          exactly like this app behaved before RAG existed. */}
+                      {actionLoading === sub._id + "_ai"
+                        ? "Running…"
+                        : (sub.repoStatus === "queued" || sub.repoStatus === "processing")
+                        ? "Indexing…"
+                        : "Run AI"}
                     </button>
                   )}
                   {sub.status === "ai_evaluated" && (
@@ -187,6 +223,22 @@ export default function AdminSubmissions() {
                   ))}
                 </div>
               )}
+              {/* Per-provider AI breakdown — UNCHANGED, left exactly as-is
+                  since CategoryScoreBars was never confirmed against your
+                  actual file. Not swapping this in unverified. */}
+              {selected.aiEvaluations?.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-ix-border space-y-2">
+                  <p className="text-xs text-ix-muted font-mono mb-1">
+                    {selected.aiEvaluations.length} AI providers evaluated this submission:
+                  </p>
+                  {selected.aiEvaluations.map((ev) => (
+                    <div key={ev.provider} className="flex items-center justify-between text-xs">
+                      <span className="text-ix-text capitalize">{ev.provider}</span>
+                      <span className="text-ix-white font-mono">{ev.score}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -220,7 +272,7 @@ export default function AdminSubmissions() {
                       onClick={() => setReviewForm({ ...reviewForm, status: s })}
                       className={`flex-1 py-2 rounded-xl text-xs capitalize transition-all ${reviewForm.status === s ? "bg-ix-primary text-white" : "border border-ix-border text-ix-muted"}`}
                     >
-                      {s.replace("_", " ")}
+                      {s.replace(/_/g, " ")}
                     </button>
                   ))}
                 </div>

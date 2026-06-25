@@ -25,16 +25,19 @@ const {
   decrUnread,
   resetUnread,
 } = require('../utils/notificationService');
-const getRedisClient = require('../config/redisClient');
-const REDIS_KEYS     = require('../config/redisKeys');
+const getRedisClient      = require('../config/redisClient');
+const REDIS_KEYS          = require('../config/redisKeys');
+const validate            = require('../validators/validate');                   // FIX: added
+const notificationSchemas = require('../validators/notificationValidators');     // FIX: added
 
 router.use(authMiddleware);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/notifications
 // 🔹 unreadCount served from Redis counter; falls back to MongoDB on miss.
+// FIX: validate middleware added — was missing despite schema existing
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', validate(notificationSchemas.listNotifications, 'query'), asyncHandler(async (req, res) => {
   const { skip, limit, page, pageSize } = getPaginationOptions(req.query);
   const userId = req.user._id;
   const filter = { userId };

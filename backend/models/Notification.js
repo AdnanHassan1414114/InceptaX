@@ -8,11 +8,13 @@ const NOTIFICATION_TYPES = [
   'member_joined',
   // Chat events
   'new_team_message',
+  'new_chat_message',   // FIX: added — for admin reply on submission chat
   // Platform events
   'new_challenge',
   'deadline_approaching',
   'submission_published',
   'rank_updated',
+  'payment_success',    // FIX: added — for plan activation notifications
 ];
 
 const notificationSchema = new mongoose.Schema(

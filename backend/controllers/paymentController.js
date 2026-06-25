@@ -127,8 +127,10 @@ exports.verifyPayment = asyncHandler(async (req, res) => {
   }, `${config.name} plan activated successfully! 🎉`));
 
   // Fire-and-forget after response
+  // FIX: was 'submission_published' which is semantically wrong for a payment event.
+  // Now uses 'payment_success' — added to Notification.NOTIFICATION_TYPES enum.
   createNotification(req.app, user._id, {
-    type:    'submission_published',
+    type:    'payment_success',
     message: `🎉 Your ${config.name} plan is now active! Expires ${expiry.toDateString()}.`,
     link:    '/pricing',
     metadata: { plan, expiresAt: expiry, razorpay_order_id, razorpay_payment_id },

@@ -262,3 +262,20 @@ input[type="checkbox"] {
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* ─── THEME TOGGLE — circular reveal transition ──────────────────────────────
+   Used by the ThemeToggle button in Navbar.jsx via document.startViewTransition.
+   Disables the browser's default cross-fade so our custom clip-path circle
+   animation (driven from JS) is the only visible transition effect.
+*/
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}

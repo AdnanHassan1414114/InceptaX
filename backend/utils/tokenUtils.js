@@ -14,7 +14,7 @@ const generateRefreshToken = (payload) => {
   });
 };
 
-// ✅ VERIFY ACCESS TOKEN (🔥 MISSING FIX)
+// ✅ VERIFY ACCESS TOKEN (MISSING FIX)
 const verifyAccessToken = (token) => {
   return jwt.verify(token, process.env.JWT_SECRET);
 };
@@ -25,16 +25,17 @@ const verifyRefreshToken = (token) => {
 };
 
 // ✅ COOKIE OPTIONS
+// FIX: secure was hardcoded false — now automatically true in production
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: false, // set true in production
+  secure:   process.env.NODE_ENV === 'production', // was: false
   sameSite: 'lax',
 };
 
 module.exports = {
   generateAccessToken,
   generateRefreshToken,
-  verifyAccessToken, // 🔥 ADD THIS
+  verifyAccessToken, //  ADD THIS
   verifyRefreshToken,
   REFRESH_COOKIE_OPTIONS,
 };

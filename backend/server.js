@@ -6,6 +6,7 @@ const { Server }   = require('socket.io');
 const cors         = require('cors');
 const cookieParser = require('cookie-parser');
 const cron         = require('node-cron');
+const rateLimit    = require('express-rate-limit'); // 🔹 NEW
 const passport     = require('./config/passportConfig');
 
 const connectDB    = require('./config/db');
@@ -53,11 +54,54 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(passport.initialize());
 
+// ── Rate Limiting ──────────────────────────────────────────────────────────
+
+// Global limiter — applies to all routes
+// 100 requests per IP per 15 minutes
+const globalLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000, // 15 minutes
+  max:              100,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  skip:             (req) => req.path === '/health', // skip health check
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many requests. Please slow down and try again later.',
+    });
+  },
+});
+
+// Auth limiter — stricter, applies to /api/auth/* only
+// 20 requests per IP per 15 minutes
+// FIX: skip OAuth (google/github) and refresh routes — these aren't brute-force
+// targets like login/register, and normal OAuth redirect flows + token refresh
+// polling were tripping this limit during regular use, not just attacks.
+const authLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000, // 15 minutes
+  max:              20,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  skip: (req) =>
+    req.path.startsWith('/google') ||
+    req.path.startsWith('/github') ||
+    req.path === '/refresh',
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many auth attempts. Please wait 15 minutes before trying again.',
+    });
+  },
+});
+
+// Apply global limiter to all routes
+app.use(globalLimiter);
+
 // ── Health ─────────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 // ── API Routes ─────────────────────────────────────────────────────────────
-app.use('/api/auth',          authRoutes);
+app.use('/api/auth',          authLimiter, authRoutes);  // 🔹 stricter limit on auth
 app.use('/api/users',         userRoutes);
 app.use('/api/assignments',   assignmentRoutes);
 app.use('/api/submissions',   submissionRoutes);
